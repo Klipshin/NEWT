@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'animated_button.dart'; // Import the animated button
+import '../animated_button.dart'; // Import from parent directory
 
 class LandingPage extends StatelessWidget {
   const LandingPage({super.key});
@@ -18,49 +18,60 @@ class LandingPage extends StatelessWidget {
           children: [
             // Treasure Chest - Left side
             Positioned(
-              left: MediaQuery.of(context).size.width * 0.07,
-              top: MediaQuery.of(context).size.height * 0.2,
+              left: MediaQuery.of(context).size.width * 0.1,
+              top: MediaQuery.of(context).size.height * 0.46,
               child: AnimatedButton(
                 imagePath: "assets/images/chest.png",
-                width: 400,
-                height: 350,
+                width: 250,
+                height: 180,
                 onTap: () => _navigateToPage(context, "Treasure"),
               ),
             ),
 
             // Basket - Right side
             Positioned(
-              right: MediaQuery.of(context).size.width * 0.04,
-              top: MediaQuery.of(context).size.height * 0.3,
+              right: MediaQuery.of(context).size.width * 0.065,
+              top: MediaQuery.of(context).size.height * 0.46,
               child: AnimatedButton(
                 imagePath: "assets/images/basket.png",
-                width: 280,
-                height: 280,
+                width: 195,
+                height: 135,
                 onTap: () => _navigateToPage(context, "Basket"),
               ),
             ),
 
             // Rocks - Center-right
             Positioned(
-              right: MediaQuery.of(context).size.width * 0.22,
-              top: MediaQuery.of(context).size.height * 0.35,
+              right: MediaQuery.of(context).size.width * 0.268,
+              top: MediaQuery.of(context).size.height * 0.445,
               child: AnimatedButton(
                 imagePath: "assets/images/rocks.png",
-                width: 280,
-                height: 180,
+                width: 200,
+                height: 97,
                 onTap: () => _navigateToPage(context, "Rocks"),
               ),
             ),
 
             // Lily Flower - Center
             Positioned(
-              left: MediaQuery.of(context).size.width * 0.4,
-              top: MediaQuery.of(context).size.height * 0.37,
+              left: MediaQuery.of(context).size.width * 0.53,
+              top: MediaQuery.of(context).size.height * 0.687,
               child: AnimatedButton(
                 imagePath: "assets/images/lilyflower.png",
-                width: 400,
-                height: 300,
+                width: 160,
+                height: 115,
                 onTap: () => _navigateToPage(context, "Lily Flower"),
+              ),
+            ),
+
+            Positioned(
+              left: MediaQuery.of(context).size.width * 0.376,
+              top: MediaQuery.of(context).size.height * 0.726,
+              child: AnimatedButton(
+                imagePath: "assets/images/frog.png",
+                width: 115,
+                height: 85,
+                onTap: () => _navigateToPage(context, "Frog"),
               ),
             ),
 
@@ -102,7 +113,7 @@ class LandingPage extends StatelessWidget {
             Positioned.fill(
               child: IgnorePointer(
                 child: Image.asset(
-                  "assets/images/bushtree.png",
+                  "assets/images/foreground.png",
                   fit: BoxFit.cover,
                 ),
               ),
