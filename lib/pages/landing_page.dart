@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../animated_button.dart'; // Import from parent directory
+import 'card_game.dart'; // Import the card game page
 
 class LandingPage extends StatelessWidget {
   const LandingPage({super.key});
@@ -52,7 +53,7 @@ class LandingPage extends StatelessWidget {
               ),
             ),
 
-            // Lily Flower - Center
+            // Lily Flower - Center (Updated to navigate to card game)
             Positioned(
               left: MediaQuery.of(context).size.width * 0.53,
               top: MediaQuery.of(context).size.height * 0.687,
@@ -60,7 +61,7 @@ class LandingPage extends StatelessWidget {
                 imagePath: "assets/images/lilyflower.png",
                 width: 160,
                 height: 115,
-                onTap: () => _navigateToPage(context, "Lily Flower"),
+                onTap: () => _navigateToCardGame(context),
               ),
             ),
 
@@ -87,7 +88,7 @@ class LandingPage extends StatelessWidget {
                     vertical: 10,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.5),
+                    color: Colors.black.withValues(alpha: 0.4),
                     borderRadius: BorderRadius.circular(15),
                   ),
                   child: const Text(
@@ -131,5 +132,11 @@ class LandingPage extends StatelessWidget {
         duration: const Duration(seconds: 1),
       ),
     );
+  }
+
+  void _navigateToCardGame(BuildContext context) {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (context) => const CardGame()));
   }
 }
