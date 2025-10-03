@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../animated_button.dart'; // Import from parent directory
 import 'card_game.dart'; // Import the card game page
+import 'fruit_game.dart'; // Import the fruit game page
 
 class LandingPage extends StatelessWidget {
   const LandingPage({super.key});
@@ -37,7 +38,7 @@ class LandingPage extends StatelessWidget {
                 imagePath: "assets/images/basket.png",
                 width: 195,
                 height: 135,
-                onTap: () => _navigateToPage(context, "Basket"),
+                onTap: () => _navigateToFruitGame(context),
               ),
             ),
 
@@ -138,5 +139,11 @@ class LandingPage extends StatelessWidget {
     Navigator.of(
       context,
     ).push(MaterialPageRoute(builder: (context) => const CardGame()));
+  }
+
+  void _navigateToFruitGame(BuildContext context) {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (context) => const FruitGame()));
   }
 }
