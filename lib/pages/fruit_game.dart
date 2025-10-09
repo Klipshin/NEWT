@@ -31,12 +31,7 @@ class _FruitGameState extends State<FruitGame> {
     'assets/images/upP.png',
     'assets/images/halfP.png', // Add halfP again for the sequence
   ];
-  final List<int> _peacockDurations = [
-    3000,
-    2000,
-    3500,
-    2000,
-  ]; // 3s, 2s, 3.5s, 2s
+  final List<int> _peacockDurations = [4500, 4500, 4500, 4500];
 
   final GlobalKey cherryBasketKey = GlobalKey();
   final GlobalKey blueberryBasketKey = GlobalKey();
@@ -293,10 +288,10 @@ class _FruitGameState extends State<FruitGame> {
     final screenWidth = MediaQuery.of(context).size.width;
     final isTablet = screenWidth > 600;
 
-    final basketSize = isTablet ? 220.0 : 140.0;
-    final baseFruitSize = isTablet ? 80.0 : 60.0; // Reduced fruit size
+    final basketSize = isTablet ? 210.0 : 130.0;
+    final baseFruitSize = isTablet ? 70.0 : 50.0; // Reduced fruit size
     final draggingFruitSize = isTablet ? 100.0 : 80.0; // Reduced dragging size
-    final peacockSize = isTablet ? 220.0 : 140.0;
+    final peacockSize = isTablet ? 390.0 : 290.0;
     final headerHeight = isTablet ? 100.0 : 80.0;
     final fontSize = isTablet ? 20.0 : 12.0;
 
@@ -316,6 +311,8 @@ class _FruitGameState extends State<FruitGame> {
             115,
           ).withOpacity(0.4), // Same method as card game
           child: SafeArea(
+            left: false,
+            bottom: false,
             child: Stack(
               children: [
                 // Header with score, timer, and counters in one row
@@ -346,8 +343,8 @@ class _FruitGameState extends State<FruitGame> {
 
                 // Peacock mascot with animation
                 Positioned(
-                  left: isTablet ? 10 : 5,
-                  bottom: isTablet ? 10 : 5,
+                  left: isTablet ? 0 : 0,
+                  bottom: isTablet ? 2.5 : 1.5,
                   child: Image.asset(
                     _peacockImages[_peacockState],
                     width: peacockSize,
@@ -358,7 +355,7 @@ class _FruitGameState extends State<FruitGame> {
 
                 // Cherry basket
                 Positioned(
-                  left: screenWidth * 0.40,
+                  left: screenWidth * 0.47,
                   bottom: isTablet ? 15 : 5,
                   child: _buildBasket(
                     key: cherryBasketKey,
@@ -460,17 +457,17 @@ class _FruitGameState extends State<FruitGame> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF4CAF50),
                         padding: EdgeInsets.symmetric(
-                          horizontal: isTablet ? 60 : 40,
-                          vertical: isTablet ? 25 : 20,
+                          horizontal: isTablet ? 15 : 5,
+                          vertical: isTablet ? 5 : 1,
                         ),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(10),
                         ),
                       ),
                       child: Text(
                         'START GAME',
                         style: TextStyle(
-                          fontSize: isTablet ? 32 : 22,
+                          fontSize: isTablet ? 10 : 5,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
                         ),
