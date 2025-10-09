@@ -17,10 +17,26 @@ class _FruitGameState extends State<FruitGame> {
   int timeLeft = 60;
   bool gameActive = false;
   Timer? _timer;
+  Timer? _peacockTimer;
 
   FruitType? currentFruit;
   Offset fruitPosition = Offset.zero;
   bool isDragging = false;
+
+  // Peacock animation states
+  int _peacockState = 0; // 0 = downP, 1 = halfP, 2 = upP
+  final List<String> _peacockImages = [
+    'assets/images/downP.png',
+    'assets/images/halfP.png',
+    'assets/images/upP.png',
+    'assets/images/halfP.png', // Add halfP again for the sequence
+  ];
+  final List<int> _peacockDurations = [
+    3000,
+    2000,
+    3500,
+    2000,
+  ]; // 3s, 2s, 3.5s, 2s
 
   final GlobalKey cherryBasketKey = GlobalKey();
   final GlobalKey blueberryBasketKey = GlobalKey();
@@ -33,6 +49,30 @@ class _FruitGameState extends State<FruitGame> {
   void initState() {
     super.initState();
     _initializeGame();
+    _startPeacockAnimation();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _peacockTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startPeacockAnimation() {
+    _updatePeacockState();
+  }
+
+  void _updatePeacockState() {
+    setState(() {
+      _peacockState = (_peacockState + 1) % 4; // Changed to 4 for the sequence
+    });
+
+    // Schedule next state change
+    _peacockTimer = Timer(
+      Duration(milliseconds: _peacockDurations[_peacockState]),
+      _updatePeacockState,
+    );
   }
 
   void _initializeGame() {
@@ -247,12 +287,6 @@ class _FruitGameState extends State<FruitGame> {
   );
 
   @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     _updateBasketPositions();
 
@@ -262,9 +296,9 @@ class _FruitGameState extends State<FruitGame> {
     final basketSize = isTablet ? 220.0 : 140.0;
     final baseFruitSize = isTablet ? 80.0 : 60.0; // Reduced fruit size
     final draggingFruitSize = isTablet ? 100.0 : 80.0; // Reduced dragging size
-    final parrotSize = isTablet ? 220.0 : 140.0;
+    final peacockSize = isTablet ? 220.0 : 140.0;
     final headerHeight = isTablet ? 100.0 : 80.0;
-    final fontSize = isTablet ? 26.0 : 18.0;
+    final fontSize = isTablet ? 20.0 : 12.0;
 
     return Scaffold(
       body: Container(
@@ -274,170 +308,177 @@ class _FruitGameState extends State<FruitGame> {
             fit: BoxFit.cover,
           ),
         ),
-        child: SafeArea(
-          child: Stack(
-            children: [
-              // Header with score, timer, and counters in one row
-              Positioned(
-                top: 10,
-                left: 20,
-                right: 20,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // Score
-                    _buildScoreDisplay(fontSize),
-
-                    // Fruit counters in the middle
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _buildModernCounter("🍒", cherryCount, fontSize),
-                        const SizedBox(width: 10),
-                        _buildModernCounter("🫐", blueberryCount, fontSize),
-                      ],
-                    ),
-
-                    // Timer
-                    _buildTimerDisplay(fontSize),
-                  ],
-                ),
-              ),
-
-              // Parrot mascot
-              Positioned(
-                left: isTablet ? 40 : 20,
-                bottom: isTablet ? 120 : 100,
-                child: Image.asset(
-                  'assets/images/par.png',
-                  width: parrotSize,
-                  height: parrotSize,
-                  fit: BoxFit.contain,
-                ),
-              ),
-
-              // Cherry basket
-              Positioned(
-                left: screenWidth * 0.15,
-                bottom: isTablet ? 40 : 20,
-                child: _buildBasket(
-                  key: cherryBasketKey,
-                  image: 'assets/images/cherrybasket.png',
-                  size: basketSize,
-                ),
-              ),
-
-              // Blueberry basket
-              Positioned(
-                right: screenWidth * 0.15,
-                bottom: isTablet ? 40 : 20,
-                child: _buildBasket(
-                  key: blueberryBasketKey,
-                  image: 'assets/images/blueberrybasket.png',
-                  size: basketSize,
-                ),
-              ),
-
-              // Draggable fruit - with reduced size
-              if (currentFruit != null)
+        child: Container(
+          color: const Color.fromARGB(
+            255,
+            130,
+            138,
+            115,
+          ).withOpacity(0.4), // Same method as card game
+          child: SafeArea(
+            child: Stack(
+              children: [
+                // Header with score, timer, and counters in one row
                 Positioned(
-                  left:
-                      fruitPosition.dx * _getGameAreaSize().width -
-                      (isDragging ? draggingFruitSize : baseFruitSize) / 2,
-                  top:
-                      fruitPosition.dy * _getGameAreaSize().height -
-                      (isDragging ? draggingFruitSize : baseFruitSize) / 2 +
-                      headerHeight,
-                  child: GestureDetector(
-                    onPanStart: _onDragStart,
-                    onPanUpdate: _onDragUpdate,
-                    onPanEnd: _onDragEnd,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      width: isDragging ? draggingFruitSize : baseFruitSize,
-                      height: isDragging ? draggingFruitSize : baseFruitSize,
-                      child: Stack(
-                        alignment: Alignment.center,
+                  top: 0.03,
+                  left: 20,
+                  right: 20,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Score
+                      _buildScoreDisplay(fontSize),
+
+                      // Fruit counters in the middle
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          // Subtle glow effect behind the fruit
-                          if (isDragging)
+                          _buildModernCounter("🍒", cherryCount, fontSize),
+                          const SizedBox(width: 8),
+                          _buildModernCounter("🫐", blueberryCount, fontSize),
+                        ],
+                      ),
+                      // Timer
+                      _buildTimerDisplay(fontSize),
+                    ],
+                  ),
+                ),
+
+                // Peacock mascot with animation
+                Positioned(
+                  left: isTablet ? 10 : 5,
+                  bottom: isTablet ? 10 : 5,
+                  child: Image.asset(
+                    _peacockImages[_peacockState],
+                    width: peacockSize,
+                    height: peacockSize,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+
+                // Cherry basket
+                Positioned(
+                  left: screenWidth * 0.40,
+                  bottom: isTablet ? 15 : 5,
+                  child: _buildBasket(
+                    key: cherryBasketKey,
+                    image: 'assets/images/cherrybasket.png',
+                    size: basketSize,
+                  ),
+                ),
+
+                // Blueberry basket
+                Positioned(
+                  right: screenWidth * 0.05,
+                  bottom: isTablet ? 15 : 5,
+                  child: _buildBasket(
+                    key: blueberryBasketKey,
+                    image: 'assets/images/blueberrybasket.png',
+                    size: basketSize,
+                  ),
+                ),
+
+                // Draggable fruit - with reduced size
+                if (currentFruit != null)
+                  Positioned(
+                    left:
+                        fruitPosition.dx * _getGameAreaSize().width -
+                        (isDragging ? draggingFruitSize : baseFruitSize) / 2,
+                    top:
+                        fruitPosition.dy * _getGameAreaSize().height -
+                        (isDragging ? draggingFruitSize : baseFruitSize) / 2 +
+                        headerHeight,
+                    child: GestureDetector(
+                      onPanStart: _onDragStart,
+                      onPanUpdate: _onDragUpdate,
+                      onPanEnd: _onDragEnd,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        width: isDragging ? draggingFruitSize : baseFruitSize,
+                        height: isDragging ? draggingFruitSize : baseFruitSize,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            // Subtle glow effect behind the fruit
+                            if (isDragging)
+                              Container(
+                                width: isDragging
+                                    ? draggingFruitSize * 1.1
+                                    : baseFruitSize,
+                                height: isDragging
+                                    ? draggingFruitSize * 1.1
+                                    : baseFruitSize,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: _getFruitGlowColor().withOpacity(
+                                        0.4,
+                                      ),
+                                      blurRadius: 15,
+                                      spreadRadius: 2,
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                            // Main fruit - this is what actually scales
                             Container(
-                              width: isDragging
-                                  ? draggingFruitSize * 1.1
-                                  : baseFruitSize,
-                              height: isDragging
-                                  ? draggingFruitSize * 1.1
-                                  : baseFruitSize,
                               decoration: BoxDecoration(
-                                shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: _getFruitGlowColor().withOpacity(
-                                      0.4,
-                                    ),
-                                    blurRadius: 15,
-                                    spreadRadius: 2,
+                                    color: Colors.black.withOpacity(0.2),
+                                    blurRadius: 8,
+                                    offset: const Offset(2, 2),
                                   ),
                                 ],
                               ),
+                              child: Image.asset(
+                                currentFruit == FruitType.cherry
+                                    ? 'assets/images/cherry.png'
+                                    : 'assets/images/blueberry.png',
+                                width: isDragging
+                                    ? draggingFruitSize
+                                    : baseFruitSize,
+                                height: isDragging
+                                    ? draggingFruitSize
+                                    : baseFruitSize,
+                                fit: BoxFit.contain,
+                              ),
                             ),
-
-                          // Main fruit - this is what actually scales
-                          Container(
-                            decoration: BoxDecoration(
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.2),
-                                  blurRadius: 8,
-                                  offset: const Offset(2, 2),
-                                ),
-                              ],
-                            ),
-                            child: Image.asset(
-                              currentFruit == FruitType.cherry
-                                  ? 'assets/images/cherry.png'
-                                  : 'assets/images/blueberry.png',
-                              width: isDragging
-                                  ? draggingFruitSize
-                                  : baseFruitSize,
-                              height: isDragging
-                                  ? draggingFruitSize
-                                  : baseFruitSize,
-                              fit: BoxFit.contain,
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
 
-              // Start button
-              if (!gameActive && currentFruit == null)
-                Center(
-                  child: ElevatedButton(
-                    onPressed: _startGame,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4CAF50),
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isTablet ? 60 : 40,
-                        vertical: isTablet ? 25 : 20,
+                // Start button
+                if (!gameActive && currentFruit == null)
+                  Center(
+                    child: ElevatedButton(
+                      onPressed: _startGame,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF4CAF50),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isTablet ? 60 : 40,
+                          vertical: isTablet ? 25 : 20,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
                       ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                    ),
-                    child: Text(
-                      'START GAME',
-                      style: TextStyle(
-                        fontSize: isTablet ? 32 : 22,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                      child: Text(
+                        'START GAME',
+                        style: TextStyle(
+                          fontSize: isTablet ? 32 : 22,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
