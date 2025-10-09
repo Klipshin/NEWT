@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
 import 'dart:async';
+import 'dart:math' as math;
 
 class FruitGame extends StatefulWidget {
   const FruitGame({super.key});
@@ -10,24 +11,21 @@ class FruitGame extends StatefulWidget {
 }
 
 class _FruitGameState extends State<FruitGame> {
-  // Game state
-  int appleCount = 0;
-  int bananaCount = 0;
+  int cherryCount = 0;
+  int blueberryCount = 0;
   int totalScore = 0;
   int timeLeft = 60;
   bool gameActive = false;
   Timer? _timer;
 
-  // Current fruit
   FruitType? currentFruit;
   Offset fruitPosition = Offset.zero;
   bool isDragging = false;
 
-  // Container positions (will be set after layout)
-  final GlobalKey appleContainerKey = GlobalKey();
-  final GlobalKey bananaContainerKey = GlobalKey();
-  Rect? appleContainerRect;
-  Rect? bananaContainerRect;
+  final GlobalKey cherryBasketKey = GlobalKey();
+  final GlobalKey blueberryBasketKey = GlobalKey();
+  Rect? cherryBasketRect;
+  Rect? blueberryBasketRect;
 
   Random random = Random();
 
@@ -39,8 +37,8 @@ class _FruitGameState extends State<FruitGame> {
 
   void _initializeGame() {
     setState(() {
-      appleCount = 0;
-      bananaCount = 0;
+      cherryCount = 0;
+      blueberryCount = 0;
       totalScore = 0;
       timeLeft = 60;
       gameActive = false;
@@ -55,12 +53,11 @@ class _FruitGameState extends State<FruitGame> {
     setState(() {
       gameActive = true;
       timeLeft = 60;
-      appleCount = 0;
-      bananaCount = 0;
+      cherryCount = 0;
+      blueberryCount = 0;
       totalScore = 0;
     });
 
-    // Start timer
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       setState(() {
         if (timeLeft > 0) {
@@ -73,7 +70,6 @@ class _FruitGameState extends State<FruitGame> {
       });
     });
 
-    // Generate first fruit
     _generateNewFruit();
   }
 
@@ -81,31 +77,29 @@ class _FruitGameState extends State<FruitGame> {
     if (!gameActive) return;
 
     setState(() {
-      currentFruit = random.nextBool() ? FruitType.apple : FruitType.banana;
-      // Position fruit in the middle of the screen
-      fruitPosition = const Offset(0.5, 0.5);
+      currentFruit = random.nextBool() ? FruitType.cherry : FruitType.blueberry;
+      final randomX = 0.2 + random.nextDouble() * 0.6;
+      final randomY = 0.2 + random.nextDouble() * 0.5;
+      fruitPosition = Offset(randomX, randomY);
       isDragging = false;
     });
   }
 
   void _onDragStart(DragStartDetails details) {
     if (!gameActive || currentFruit == null) return;
-    setState(() {
-      isDragging = true;
-    });
+    setState(() => isDragging = true);
   }
 
   void _onDragUpdate(DragUpdateDetails details) {
     if (!gameActive || currentFruit == null) return;
-
     setState(() {
-      // Convert to relative position (0-1 range)
-      final newX =
-          (fruitPosition.dx + details.delta.dx / _getGameAreaSize().width)
-              .clamp(0.0, 1.0);
-      final newY =
-          (fruitPosition.dy + details.delta.dy / _getGameAreaSize().height)
-              .clamp(0.0, 1.0);
+      final gameSize = _getGameAreaSize();
+      final newX = (fruitPosition.dx + details.delta.dx / gameSize.width).clamp(
+        0.0,
+        1.0,
+      );
+      final newY = (fruitPosition.dy + details.delta.dy / gameSize.height)
+          .clamp(0.0, 1.0);
       fruitPosition = Offset(newX, newY);
     });
   }
@@ -113,76 +107,62 @@ class _FruitGameState extends State<FruitGame> {
   void _onDragEnd(DragEndDetails details) {
     if (!gameActive || currentFruit == null) return;
 
-    // Check if fruit is dropped in correct container
     final fruitCenter = _getFruitCenter();
     bool scored = false;
 
-    if (currentFruit == FruitType.apple &&
-        appleContainerRect != null &&
-        appleContainerRect!.contains(fruitCenter)) {
+    if (currentFruit == FruitType.cherry &&
+        cherryBasketRect != null &&
+        cherryBasketRect!.contains(fruitCenter)) {
       setState(() {
-        appleCount++;
+        cherryCount++;
         totalScore += 10;
         scored = true;
       });
-    } else if (currentFruit == FruitType.banana &&
-        bananaContainerRect != null &&
-        bananaContainerRect!.contains(fruitCenter)) {
+    } else if (currentFruit == FruitType.blueberry &&
+        blueberryBasketRect != null &&
+        blueberryBasketRect!.contains(fruitCenter)) {
       setState(() {
-        bananaCount++;
+        blueberryCount++;
         totalScore += 10;
         scored = true;
       });
     }
 
     if (scored) {
-      // Success - generate new fruit after short delay
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted && gameActive) {
-          _generateNewFruit();
-        }
+      Future.delayed(const Duration(milliseconds: 400), () {
+        if (mounted && gameActive) _generateNewFruit();
       });
     } else {
-      // Not in container - reset position
-      setState(() {
-        fruitPosition = const Offset(0.5, 0.5);
-        isDragging = false;
-      });
+      setState(() => isDragging = false);
     }
   }
 
-  void _updateContainerPositions() {
+  void _updateBasketPositions() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final appleContext = appleContainerKey.currentContext;
-      final bananaContext = bananaContainerKey.currentContext;
-
-      if (appleContext != null) {
-        final box = appleContext.findRenderObject() as RenderBox;
-        appleContainerRect = box.localToGlobal(Offset.zero) & box.size;
+      final cherryContext = cherryBasketKey.currentContext;
+      final blueberryContext = blueberryBasketKey.currentContext;
+      if (cherryContext != null) {
+        final box = cherryContext.findRenderObject() as RenderBox;
+        cherryBasketRect = box.localToGlobal(Offset.zero) & box.size;
       }
-
-      if (bananaContext != null) {
-        final box = bananaContext.findRenderObject() as RenderBox;
-        bananaContainerRect = box.localToGlobal(Offset.zero) & box.size;
+      if (blueberryContext != null) {
+        final box = blueberryContext.findRenderObject() as RenderBox;
+        blueberryBasketRect = box.localToGlobal(Offset.zero) & box.size;
       }
     });
   }
 
   Size _getGameAreaSize() {
     final mediaQuery = MediaQuery.of(context);
-    return Size(
-      mediaQuery.size.width,
-      mediaQuery.size.height - 200, // Account for header and instructions
-    );
+    return Size(mediaQuery.size.width, mediaQuery.size.height - 120);
   }
 
   Offset _getFruitCenter() {
     final gameSize = _getGameAreaSize();
-    final fruitPixelPosition = Offset(
+    return Offset(
       fruitPosition.dx * gameSize.width,
-      fruitPosition.dy * gameSize.height + 100, // Add header height
+      fruitPosition.dy * gameSize.height + 80,
     );
-    return fruitPixelPosition;
   }
 
   void _showGameOver() {
@@ -190,42 +170,81 @@ class _FruitGameState extends State<FruitGame> {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        backgroundColor: Colors.orange[50],
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text(
-          'Game Over!',
-          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          '🎉 Game Over! 🎉',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'Final Score: $totalScore',
-              style: const TextStyle(fontSize: 18),
+              'Score: $totalScore',
+              style: const TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFFE94B3C),
+              ),
             ),
-            const SizedBox(height: 10),
-            Text('Apples Collected: $appleCount'),
-            Text('Bananas Collected: $bananaCount'),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildResult("🍒", cherryCount),
+                _buildResult("🫐", blueberryCount),
+              ],
+            ),
           ],
         ),
         actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              _initializeGame();
-            },
-            child: const Text('Play Again'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              Navigator.of(context).pop();
-            },
-            child: const Text('Exit'),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    _initializeGame();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4CAF50),
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                  ),
+                  child: const Text(
+                    'Play Again',
+                    style: TextStyle(fontSize: 18, color: Colors.white),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFE94B3C),
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                  ),
+                  child: const Text(
+                    'Exit',
+                    style: TextStyle(fontSize: 18, color: Colors.white),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
+
+  Widget _buildResult(String emoji, int count) => Column(
+    children: [
+      Text(emoji, style: const TextStyle(fontSize: 40)),
+      const SizedBox(height: 5),
+      Text('$count', style: const TextStyle(fontSize: 24)),
+    ],
+  );
 
   @override
   void dispose() {
@@ -235,222 +254,309 @@ class _FruitGameState extends State<FruitGame> {
 
   @override
   Widget build(BuildContext context) {
-    // Update container positions after build
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _updateContainerPositions(),
-    );
+    _updateBasketPositions();
+
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isTablet = screenWidth > 600;
+
+    final basketSize = isTablet ? 220.0 : 140.0;
+    final baseFruitSize = isTablet ? 80.0 : 60.0; // Reduced fruit size
+    final draggingFruitSize = isTablet ? 100.0 : 80.0; // Reduced dragging size
+    final parrotSize = isTablet ? 220.0 : 140.0;
+    final headerHeight = isTablet ? 100.0 : 80.0;
+    final fontSize = isTablet ? 26.0 : 18.0;
 
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF87CEEB), Color(0xFF98FB98)],
+          image: DecorationImage(
+            image: AssetImage('assets/images/picnic.jpg'),
+            fit: BoxFit.cover,
           ),
         ),
-        child: Column(
-          children: [
-            // Header with timer and score
-            Container(
-              padding: const EdgeInsets.all(16),
-              color: Colors.black.withOpacity(0.1),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _buildStatItem('TIME', '$timeLeft', Icons.timer),
-                  _buildStatItem('SCORE', '$totalScore', Icons.star),
-                  _buildStatItem('APPLES', '$appleCount', Icons.apple),
-                  _buildStatItem('BANANAS', '$bananaCount', Icons.celebration),
-                ],
-              ),
-            ),
+        child: SafeArea(
+          child: Stack(
+            children: [
+              // Header with score, timer, and counters in one row
+              Positioned(
+                top: 10,
+                left: 20,
+                right: 20,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // Score
+                    _buildScoreDisplay(fontSize),
 
-            // Game area
-            Expanded(
-              child: Stack(
-                children: [
-                  // Containers
-                  Positioned(
-                    left: 20,
-                    top: 20,
-                    child: _buildContainer(
-                      key: appleContainerKey,
-                      label: 'APPLE BASKET',
-                      count: appleCount,
-                      color: Colors.red,
-                      icon: Icons.apple,
-                    ),
-                  ),
-                  Positioned(
-                    right: 20,
-                    top: 20,
-                    child: _buildContainer(
-                      key: bananaContainerKey,
-                      label: 'BANANA BASKET',
-                      count: bananaCount,
-                      color: Colors.yellow,
-                      icon: Icons.celebration,
-                    ),
-                  ),
-
-                  // Current fruit (if any)
-                  if (currentFruit != null)
-                    Positioned(
-                      left: fruitPosition.dx * _getGameAreaSize().width - 30,
-                      top: fruitPosition.dy * _getGameAreaSize().height - 30,
-                      child: GestureDetector(
-                        onPanStart: _onDragStart,
-                        onPanUpdate: _onDragUpdate,
-                        onPanEnd: _onDragEnd,
-                        child: Container(
-                          width: 60,
-                          height: 60,
-                          decoration: BoxDecoration(
-                            color: isDragging
-                                ? Colors.white.withOpacity(0.8)
-                                : Colors.white,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.3),
-                                blurRadius: 5,
-                                offset: const Offset(2, 2),
-                              ),
-                            ],
-                          ),
-                          child: Center(
-                            child: Text(
-                              currentFruit == FruitType.apple ? '🍎' : '🍌',
-                              style: const TextStyle(fontSize: 40),
-                            ),
-                          ),
-                        ),
-                      ),
+                    // Fruit counters in the middle
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _buildModernCounter("🍒", cherryCount, fontSize),
+                        const SizedBox(width: 10),
+                        _buildModernCounter("🫐", blueberryCount, fontSize),
+                      ],
                     ),
 
-                  // Start button (centered when game not active)
-                  if (!gameActive && currentFruit == null)
-                    Center(
-                      child: ElevatedButton(
-                        onPressed: _startGame,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 40,
-                            vertical: 20,
-                          ),
-                          textStyle: const TextStyle(fontSize: 24),
-                        ),
-                        child: const Text('START GAME'),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-
-            // Instructions
-            Container(
-              padding: const EdgeInsets.all(16),
-              color: Colors.black.withOpacity(0.1),
-              child: const Column(
-                children: [
-                  Text(
-                    'Drag the fruit to the correct basket!',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    '🍎 → Red Basket | 🍌 → Yellow Basket',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 14),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatItem(String label, String value, IconData icon) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 20, color: Colors.white),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 18,
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildContainer({
-    required GlobalKey key,
-    required String label,
-    required int count,
-    required Color color,
-    required IconData icon,
-  }) {
-    return Container(
-      key: key,
-      width: 120,
-      height: 150,
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.3),
-        border: Border.all(color: color, width: 3),
-        borderRadius: BorderRadius.circular(15),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 30, color: color),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(fontWeight: FontWeight.bold, color: color),
-          ),
-          const SizedBox(height: 10),
-          Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(25),
-              border: Border.all(color: color, width: 2),
-            ),
-            child: Center(
-              child: Text(
-                '$count',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: color,
+                    // Timer
+                    _buildTimerDisplay(fontSize),
+                  ],
                 ),
               ),
+
+              // Parrot mascot
+              Positioned(
+                left: isTablet ? 40 : 20,
+                bottom: isTablet ? 120 : 100,
+                child: Image.asset(
+                  'assets/images/par.png',
+                  width: parrotSize,
+                  height: parrotSize,
+                  fit: BoxFit.contain,
+                ),
+              ),
+
+              // Cherry basket
+              Positioned(
+                left: screenWidth * 0.15,
+                bottom: isTablet ? 40 : 20,
+                child: _buildBasket(
+                  key: cherryBasketKey,
+                  image: 'assets/images/cherrybasket.png',
+                  size: basketSize,
+                ),
+              ),
+
+              // Blueberry basket
+              Positioned(
+                right: screenWidth * 0.15,
+                bottom: isTablet ? 40 : 20,
+                child: _buildBasket(
+                  key: blueberryBasketKey,
+                  image: 'assets/images/blueberrybasket.png',
+                  size: basketSize,
+                ),
+              ),
+
+              // Draggable fruit - with reduced size
+              if (currentFruit != null)
+                Positioned(
+                  left:
+                      fruitPosition.dx * _getGameAreaSize().width -
+                      (isDragging ? draggingFruitSize : baseFruitSize) / 2,
+                  top:
+                      fruitPosition.dy * _getGameAreaSize().height -
+                      (isDragging ? draggingFruitSize : baseFruitSize) / 2 +
+                      headerHeight,
+                  child: GestureDetector(
+                    onPanStart: _onDragStart,
+                    onPanUpdate: _onDragUpdate,
+                    onPanEnd: _onDragEnd,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      width: isDragging ? draggingFruitSize : baseFruitSize,
+                      height: isDragging ? draggingFruitSize : baseFruitSize,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          // Subtle glow effect behind the fruit
+                          if (isDragging)
+                            Container(
+                              width: isDragging
+                                  ? draggingFruitSize * 1.1
+                                  : baseFruitSize,
+                              height: isDragging
+                                  ? draggingFruitSize * 1.1
+                                  : baseFruitSize,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: _getFruitGlowColor().withOpacity(
+                                      0.4,
+                                    ),
+                                    blurRadius: 15,
+                                    spreadRadius: 2,
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                          // Main fruit - this is what actually scales
+                          Container(
+                            decoration: BoxDecoration(
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.2),
+                                  blurRadius: 8,
+                                  offset: const Offset(2, 2),
+                                ),
+                              ],
+                            ),
+                            child: Image.asset(
+                              currentFruit == FruitType.cherry
+                                  ? 'assets/images/cherry.png'
+                                  : 'assets/images/blueberry.png',
+                              width: isDragging
+                                  ? draggingFruitSize
+                                  : baseFruitSize,
+                              height: isDragging
+                                  ? draggingFruitSize
+                                  : baseFruitSize,
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
+              // Start button
+              if (!gameActive && currentFruit == null)
+                Center(
+                  child: ElevatedButton(
+                    onPressed: _startGame,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF4CAF50),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isTablet ? 60 : 40,
+                        vertical: isTablet ? 25 : 20,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                    ),
+                    child: Text(
+                      'START GAME',
+                      style: TextStyle(
+                        fontSize: isTablet ? 32 : 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModernCounter(String emoji, int count, double fontSize) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.9),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(emoji, style: TextStyle(fontSize: fontSize - 2)),
+          const SizedBox(width: 6),
+          Text(
+            '$count',
+            style: TextStyle(
+              fontSize: fontSize - 2,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
             ),
           ),
         ],
       ),
     );
   }
+
+  Color _getFruitGlowColor() {
+    switch (currentFruit) {
+      case FruitType.cherry:
+        return Colors.red;
+      case FruitType.blueberry:
+        return Colors.blue;
+      default:
+        return Colors.yellow;
+    }
+  }
+
+  Widget _buildBasket({
+    required GlobalKey key,
+    required String image,
+    required double size,
+  }) {
+    return Container(
+      key: key,
+      child: Image.asset(image, width: size, height: size, fit: BoxFit.contain),
+    );
+  }
+
+  Widget _buildScoreDisplay(double fontSize) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    decoration: BoxDecoration(
+      color: Colors.white.withOpacity(0.9),
+      borderRadius: BorderRadius.circular(25),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.2),
+          blurRadius: 8,
+          offset: const Offset(0, 2),
+        ),
+      ],
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.emoji_events, color: Colors.amber, size: 20),
+        const SizedBox(width: 8),
+        Text(
+          '$totalScore',
+          style: TextStyle(
+            fontSize: fontSize,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          ),
+        ),
+      ],
+    ),
+  );
+
+  Widget _buildTimerDisplay(double fontSize) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    decoration: BoxDecoration(
+      color: Colors.white.withOpacity(0.9),
+      borderRadius: BorderRadius.circular(25),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.2),
+          blurRadius: 8,
+          offset: const Offset(0, 2),
+        ),
+      ],
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.timer, color: Colors.red, size: 20),
+        const SizedBox(width: 8),
+        Text(
+          '00:${timeLeft.toString().padLeft(2, '0')}',
+          style: TextStyle(
+            fontSize: fontSize,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
-enum FruitType { apple, banana }
+enum FruitType { cherry, blueberry }
