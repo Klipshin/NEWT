@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
 import 'dart:async';
-import 'dart:math' as math;
 
 class FruitGame extends StatefulWidget {
   const FruitGame({super.key});
