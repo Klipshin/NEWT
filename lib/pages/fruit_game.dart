@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:math';
 import 'dart:async';
 import 'dart:math' as math;
+import 'package:audioplayers/audioplayers.dart';
 
 class FruitGame extends StatefulWidget {
   const FruitGame({super.key});
@@ -22,6 +23,8 @@ class _FruitGameState extends State<FruitGame> {
   FruitType? currentFruit;
   Offset fruitPosition = Offset.zero;
   bool isDragging = false;
+  late AudioPlayer _bgMusicPlayer;
+  bool _isMuted = false;
 
   // Peacock animation states
   int _peacockState = 0; // 0 = downP, 1 = halfP, 2 = upP
@@ -45,12 +48,15 @@ class _FruitGameState extends State<FruitGame> {
     super.initState();
     _initializeGame();
     _startPeacockAnimation();
+    _bgMusicPlayer = AudioPlayer();
+    _playBackgroundMusic();
   }
 
   @override
   void dispose() {
     _timer?.cancel();
     _peacockTimer?.cancel();
+    _bgMusicPlayer.dispose();
     super.dispose();
   }
 
@@ -80,6 +86,11 @@ class _FruitGameState extends State<FruitGame> {
       currentFruit = null;
       isDragging = false;
     });
+  }
+
+  Future<void> _playBackgroundMusic() async {
+    await _bgMusicPlayer.setReleaseMode(ReleaseMode.loop);
+    await _bgMusicPlayer.play(AssetSource('sounds/basket.mp3'));
   }
 
   void _startGame() {

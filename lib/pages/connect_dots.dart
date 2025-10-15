@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 class ConnectDotsGame extends StatefulWidget {
   const ConnectDotsGame({super.key});
@@ -21,6 +22,8 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
 
   late AnimationController _winController;
   bool gameComplete = false;
+  late AudioPlayer _bgMusicPlayer;
+  bool _isMuted = false;
 
   // Style variations
   int currentStyle = 0;
@@ -55,6 +58,8 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
     colorMap = colorStyles[currentStyle];
     _initializeGame();
     _startMascotAnimation();
+    _bgMusicPlayer = AudioPlayer();
+    _playBackgroundMusic();
     _winController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 1),
@@ -65,6 +70,7 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
   void dispose() {
     _mascotTimer?.cancel();
     _winController.dispose();
+    _bgMusicPlayer.dispose();
     super.dispose();
   }
 
@@ -91,6 +97,11 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
     _generateSolvablePuzzle();
 
     setState(() {});
+  }
+
+  Future<void> _playBackgroundMusic() async {
+    await _bgMusicPlayer.setReleaseMode(ReleaseMode.loop);
+    await _bgMusicPlayer.play(AssetSource('sounds/dots.mp3'));
   }
 
   void _generateSolvablePuzzle() {

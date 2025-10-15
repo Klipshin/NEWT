@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 class CardGame extends StatefulWidget {
   const CardGame({super.key});
@@ -16,6 +17,8 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
   int moves = 0;
   late AnimationController _flipController;
   late AnimationController _matchController;
+  late AudioPlayer _bgMusicPlayer;
+  bool _isMuted = false;
 
   int _frogFrame = 0; // 0 = eyeopen, 1 = close, 2 = mouth
   Timer? _mascotTimer;
@@ -40,6 +43,9 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
     );
 
     _initializeGame();
+    _bgMusicPlayer = AudioPlayer();
+    _playBackgroundMusic();
+
     _startMascotAnimation();
   }
 
@@ -48,6 +54,7 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
     _flipController.dispose();
     _matchController.dispose();
     _mascotTimer?.cancel();
+    _bgMusicPlayer.dispose();
     super.dispose();
   }
 
@@ -77,6 +84,11 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
       cards.add(GameCard(id: i, imagePath: gameImages[i]));
     }
     setState(() {});
+  }
+
+  Future<void> _playBackgroundMusic() async {
+    await _bgMusicPlayer.setReleaseMode(ReleaseMode.loop);
+    await _bgMusicPlayer.play(AssetSource('sounds/card.mp3'));
   }
 
   void _flipCard(int index) {
@@ -265,6 +277,28 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
                   ),
                 ),
                 // Right sidebar
+                /* const SizedBox(height: 20),
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.9),
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  child: IconButton(
+                    icon: Icon(
+                      _isMuted ? Icons.volume_off : Icons.volume_up,
+                      color: Colors.green.shade700,
+                    ),
+                    tooltip: _isMuted ? 'Unmute Music' : 'Mute Music',
+                    onPressed: () async {
+                      setState(() => _isMuted = !_isMuted);
+                      if (_isMuted) {
+                        await _bgMusicPlayer.pause();
+                      } else {
+                        await _bgMusicPlayer.resume();
+                      }
+                    },
+                  ),
+                ), */
                 Container(
                   width: 90,
                   padding: const EdgeInsets.all(8),
