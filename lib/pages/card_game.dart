@@ -195,7 +195,7 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
       body: Container(
         decoration: const BoxDecoration(
           image: DecorationImage(
-            image: AssetImage("assets/images/swamp.png"),
+            image: AssetImage("assets/images/swamp_new.png"),
             fit: BoxFit.cover,
           ),
         ),
@@ -277,6 +277,7 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
                   ),
                 ),
                 // Right sidebar
+                //mute/unmute button and stats
                 /* const SizedBox(height: 20),
                 Container(
                   decoration: BoxDecoration(

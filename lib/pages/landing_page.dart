@@ -14,7 +14,7 @@ class LandingPage extends StatelessWidget {
       body: Container(
         decoration: const BoxDecoration(
           image: DecorationImage(
-            image: AssetImage("assets/images/swamp.png"),
+            image: AssetImage("assets/images/swamp_new.png"),
             fit: BoxFit.cover,
           ),
         ),
@@ -132,7 +132,7 @@ class LandingPage extends StatelessWidget {
                 Positioned.fill(
                   child: IgnorePointer(
                     child: Image.asset(
-                      "assets/images/foreground.png",
+                      "assets/images/foreground_new.png",
                       fit: BoxFit.cover,
                     ),
                   ),

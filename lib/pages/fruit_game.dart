@@ -310,7 +310,7 @@ class _FruitGameState extends State<FruitGame> {
       body: Container(
         decoration: const BoxDecoration(
           image: DecorationImage(
-            image: AssetImage('assets/images/picnic.jpg'),
+            image: AssetImage('assets/images/picnic_new.png'),
             fit: BoxFit.cover,
           ),
         ),

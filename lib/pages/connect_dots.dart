@@ -391,7 +391,7 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
       body: Container(
         decoration: const BoxDecoration(
           image: DecorationImage(
-            image: AssetImage("assets/images/swamp.png"),
+            image: AssetImage("assets/images/swamp_new.png"),
             fit: BoxFit.cover,
           ),
         ),
