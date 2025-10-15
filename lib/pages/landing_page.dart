@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../animated_button.dart';
 import 'card_game.dart';
 import 'fruit_game.dart';
+import 'connect_dots.dart';
 
 class LandingPage extends StatelessWidget {
   const LandingPage({super.key});
@@ -88,7 +89,7 @@ class LandingPage extends StatelessWidget {
                     imagePath: "assets/images/frog.png",
                     width: 100 * clampedScale,
                     height: 64 * clampedScale,
-                    onTap: () => _navigateToPage(context, "Frog"),
+                    onTap: () => _navigateToConnectDotsGame(context),
                   ),
                 ),
 
@@ -162,5 +163,11 @@ class LandingPage extends StatelessWidget {
     Navigator.of(
       context,
     ).push(MaterialPageRoute(builder: (context) => const FruitGame()));
+  }
+
+  void _navigateToConnectDotsGame(BuildContext context) {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (context) => const ConnectDotsGame()));
   }
 }
