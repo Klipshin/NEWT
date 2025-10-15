@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../animated_button.dart';
 import 'card_game.dart';
 import 'fruit_game.dart';
-import 'the_red_ball.dart';
+import 'storybooks.dart';
 
 class LandingPage extends StatelessWidget {
   const LandingPage({super.key});
@@ -41,7 +41,7 @@ class LandingPage extends StatelessWidget {
                     imagePath: "assets/images/chest.png",
                     width: 190 * clampedScale,
                     height: 130 * clampedScale,
-                    onTap: () => _navigateToStoryBookPage1(context),
+                    onTap: () => _navigateToStoryBooksPage(context),
                   ),
                 ),
 
@@ -165,9 +165,9 @@ class LandingPage extends StatelessWidget {
     ).push(MaterialPageRoute(builder: (context) => const FruitGame()));
   }
 
-  void _navigateToStoryBookPage1(BuildContext context) {
+  void _navigateToStoryBooksPage(BuildContext context) {
     Navigator.of(
       context,
-    ).push(MaterialPageRoute(builder: (context) => const StoryBookPage1()));
+    ).push(MaterialPageRoute(builder: (context) => const StoryBooksPage()));
   }
 }
