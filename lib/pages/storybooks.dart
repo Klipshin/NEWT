@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'the_red_ball.dart'; // ✅ make sure this import matches your file name
+import 'the_red_ball.dart';
+import 'the_busy_ant.dart';
 
 class StoryBooksPage extends StatelessWidget {
   const StoryBooksPage({super.key});
@@ -22,13 +23,13 @@ class StoryBooksPage extends StatelessWidget {
             child: Image.asset('assets/images/stories.png', fit: BoxFit.cover),
           ),
 
-          // 🔙 Previous Button (smaller and clickable)
+          // 🔙 Previous Button
           Positioned(
             top: 40,
             left: 15,
             child: GestureDetector(
               onTap: () {
-                Navigator.pop(context); // ✅ Go back to previous page
+                Navigator.pop(context);
               },
               child: Image.asset(
                 'assets/images/previous.png',
@@ -38,14 +39,10 @@ class StoryBooksPage extends StatelessWidget {
             ),
           ),
 
-          // 📚 Horizontally Scrollable Story Cards
           Center(
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.only(
-                left: 80,
-                right: 20,
-              ), // added space from left
+              padding: const EdgeInsets.only(left: 80, right: 20),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: List.generate(stories.length, (index) {
@@ -55,19 +52,24 @@ class StoryBooksPage extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 15),
                     child: GestureDetector(
                       onTap: () {
-                        // ✅ Open "The Red Ball" when story1 is clicked
                         if (index == 0) {
                           Navigator.of(context).push(
                             MaterialPageRoute(
                               builder: (context) => const StoryBookPage1(),
                             ),
                           );
+                        } else if (index == 1) {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => const StoryBookPage2(),
+                            ),
+                          );
                         }
                       },
                       child: Image.asset(
                         path,
-                        width: 280, // card width
-                        height: 380, // card height
+                        width: 280,
+                        height: 380,
                         fit: BoxFit.contain,
                       ),
                     ),
