@@ -12,7 +12,9 @@ class ConnectDotsGame extends StatefulWidget {
 
 class _ConnectDotsGameState extends State<ConnectDotsGame>
     with TickerProviderStateMixin {
-  static const int gridSize = 5;
+  int gridSize = 4; // Start with 4x4
+  int level = 1;
+  int puzzlesSolved = 0;
 
   late List<List<String?>> grid;
   String? currentColor;
@@ -25,7 +27,7 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
   late AudioPlayer _bgMusicPlayer;
   bool _isMuted = false;
 
-  // Style variations
+  // Extended color styles with more colors for higher levels
   int currentStyle = 0;
   final List<Map<String, Color>> colorStyles = [
     {
@@ -33,18 +35,24 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
       "blue": Colors.blue,
       "yellow": Colors.yellow,
       "pink": Colors.pinkAccent,
+      "green": Colors.green,
+      "orange": Colors.orange,
     },
     {
       "red": Colors.orange,
       "blue": Colors.purple,
       "yellow": Colors.lime,
       "pink": Colors.cyan,
+      "green": Colors.teal,
+      "orange": Colors.deepOrange,
     },
     {
       "red": Color(0xFFFF6B6B),
       "blue": Color(0xFF4ECDC4),
       "yellow": Color(0xFFFFE66D),
       "pink": Color(0xFFA8E6CF),
+      "green": Color(0xFF95E1D3),
+      "orange": Color(0xFFFFAA5A),
     },
   ];
 
@@ -54,8 +62,8 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
   @override
   void initState() {
     super.initState();
-    colors = ["red", "blue", "yellow", "pink"];
     colorMap = colorStyles[currentStyle];
+    _updateColorsForLevel();
     _initializeGame();
     _startMascotAnimation();
     _bgMusicPlayer = AudioPlayer();
@@ -74,6 +82,52 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
     super.dispose();
   }
 
+  void _updateColorsForLevel() {
+    // Progressive difficulty with more colors and bigger grids
+    if (level == 1) {
+      gridSize = 4;
+      colors = ["red", "blue", "yellow"];
+    } else if (level == 2) {
+      gridSize = 4;
+      colors = ["red", "blue", "yellow", "pink"];
+    } else if (level == 3) {
+      gridSize = 5;
+      colors = ["red", "blue", "yellow", "pink"];
+    } else if (level == 4) {
+      gridSize = 5;
+      colors = ["red", "blue", "yellow", "pink", "green"];
+    } else if (level == 5) {
+      gridSize = 6;
+      colors = ["red", "blue", "yellow", "pink", "green"];
+    } else if (level == 6) {
+      gridSize = 6;
+      colors = ["red", "blue", "yellow", "pink", "green", "orange"];
+    } else {
+      // Level 7+: Keep 6x6 with 6 colors but increase complexity
+      gridSize = 6;
+      colors = ["red", "blue", "yellow", "pink", "green", "orange"];
+    }
+  }
+
+  String _getLevelDescription() {
+    switch (level) {
+      case 1:
+        return "4×4 Grid - 3 Colors";
+      case 2:
+        return "4×4 Grid - 4 Colors";
+      case 3:
+        return "5×5 Grid - 4 Colors";
+      case 4:
+        return "5×5 Grid - 5 Colors";
+      case 5:
+        return "6×6 Grid - 5 Colors";
+      case 6:
+        return "6×6 Grid - 6 Colors";
+      default:
+        return "6×6 Grid - Expert Mode";
+    }
+  }
+
   void _startMascotAnimation() {
     _mascotTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
       if (mounted) {
@@ -85,6 +139,7 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
   }
 
   void _initializeGame() {
+    // Clear everything first
     gameComplete = false;
     currentColor = null;
     paths.clear();
@@ -96,7 +151,10 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
     // Generate a solvable puzzle
     _generateSolvablePuzzle();
 
-    setState(() {});
+    // Force rebuild after state is fully updated
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   Future<void> _playBackgroundMusic() async {
@@ -104,21 +162,51 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
     await _bgMusicPlayer.play(AssetSource('sounds/dots.mp3'));
   }
 
-  void _generateSolvablePuzzle() {
-    // Create empty grid
+  void _generateSolvablePuzzle({int recursionDepth = 0}) {
+    // Prevent infinite recursion
+    if (recursionDepth > 10) {
+      // Fallback: create a simpler puzzle
+      _generateSimplePuzzle();
+      return;
+    }
+
+    // ALWAYS create a fresh empty grid at the start
     grid = List.generate(gridSize, (_) => List.filled(gridSize, null));
 
-    // Generate paths first, then place endpoints
-    Map<String, List<Offset>> generatedPaths = {};
+    // Generate paths - each color appears EXACTLY twice (one pair of dots)
+    // IMPORTANT: occupiedCells must be reset here too
     Set<Offset> occupiedCells = {};
-
     final rand = Random();
 
-    for (var color in colors) {
+    // Track successfully placed colors to detect if we need to restart
+    Set<String> placedColors = {};
+
+    // Keep track of which colors have been placed
+    List<String> shuffledColors = List.from(colors)..shuffle();
+
+    for (var color in shuffledColors) {
       bool pathCreated = false;
       int attempts = 0;
 
-      while (!pathCreated && attempts < 50) {
+      // Before placing this color, verify grid doesn't already have it
+      bool colorAlreadyOnGrid = false;
+      for (int y = 0; y < gridSize; y++) {
+        for (int x = 0; x < gridSize; x++) {
+          if (grid[y][x] == color) {
+            colorAlreadyOnGrid = true;
+            break;
+          }
+        }
+        if (colorAlreadyOnGrid) break;
+      }
+
+      if (colorAlreadyOnGrid) {
+        // Grid is corrupted, restart completely
+        _generateSolvablePuzzle(recursionDepth: recursionDepth + 1);
+        return;
+      }
+
+      while (!pathCreated && attempts < 100) {
         attempts++;
 
         // Pick random start position
@@ -133,8 +221,10 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
         Set<Offset> pathSet = {start};
         Offset current = start;
 
-        // Random walk for 3-8 steps
-        int targetLength = 3 + rand.nextInt(6);
+        // Path length increases with level
+        int minLength = 2 + (level ~/ 2);
+        int maxLength = 4 + level;
+        int targetLength = minLength + rand.nextInt(maxLength - minLength + 1);
 
         for (int i = 0; i < targetLength; i++) {
           List<Offset> possibleMoves = _getPossibleMoves(
@@ -154,22 +244,85 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
 
         // Path must be at least 2 cells long
         if (path.length >= 2) {
-          generatedPaths[color] = path;
           occupiedCells.addAll(pathSet);
 
-          // Place the endpoints on the grid
-          grid[path.first.dy.toInt()][path.first.dx.toInt()] = color;
-          grid[path.last.dy.toInt()][path.last.dx.toInt()] = color;
+          // Place ONLY the two endpoints on the grid (start and end)
+          // This ensures each color appears exactly twice
+          int startYPos = path.first.dy.toInt();
+          int startXPos = path.first.dx.toInt();
+          int endYPos = path.last.dy.toInt();
+          int endXPos = path.last.dx.toInt();
 
-          pathCreated = true;
+          // Double-check these cells are actually empty before placing
+          if (grid[startYPos][startXPos] == null &&
+              grid[endYPos][endXPos] == null) {
+            grid[startYPos][startXPos] = color;
+            grid[endYPos][endXPos] = color;
+            placedColors.add(color);
+            pathCreated = true;
+          }
         }
       }
 
-      // If we couldn't create a path, reset and try again
+      // If we couldn't create a path after many attempts, start over completely
       if (!pathCreated) {
-        _generateSolvablePuzzle();
+        _generateSolvablePuzzle(recursionDepth: recursionDepth + 1);
         return;
       }
+    }
+
+    // Final validation: count dots for each color
+    Map<String, int> colorCounts = {};
+    for (int y = 0; y < gridSize; y++) {
+      for (int x = 0; x < gridSize; x++) {
+        String? cellColor = grid[y][x];
+        if (cellColor != null) {
+          colorCounts[cellColor] = (colorCounts[cellColor] ?? 0) + 1;
+        }
+      }
+    }
+
+    // Check if any color has more or less than 2 dots
+    for (var color in colors) {
+      int count = colorCounts[color] ?? 0;
+      if (count != 2) {
+        // Invalid puzzle detected! Regenerate completely
+        print('Invalid puzzle detected: $color has $count dots instead of 2');
+        _generateSolvablePuzzle(recursionDepth: recursionDepth + 1);
+        return;
+      }
+    }
+
+    // Also verify no extra colors on grid
+    for (var entry in colorCounts.entries) {
+      if (!colors.contains(entry.key)) {
+        print('Extra color detected on grid: ${entry.key}');
+        _generateSolvablePuzzle(recursionDepth: recursionDepth + 1);
+        return;
+      }
+    }
+  }
+
+  void _generateSimplePuzzle() {
+    // Fallback simple puzzle generator
+    grid = List.generate(gridSize, (_) => List.filled(gridSize, null));
+    final rand = Random();
+
+    for (var color in colors) {
+      // Place first dot
+      int x1, y1, x2, y2;
+      do {
+        x1 = rand.nextInt(gridSize);
+        y1 = rand.nextInt(gridSize);
+      } while (grid[y1][x1] != null);
+      grid[y1][x1] = color;
+
+      // Place second dot
+      do {
+        x2 = rand.nextInt(gridSize);
+        y2 = rand.nextInt(gridSize);
+      } while (grid[y2][x2] != null);
+      grid[y2][x2] = color;
     }
   }
 
@@ -255,7 +408,7 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
             currentColor = null;
 
             if (_checkComplete()) {
-              _showWinDialog();
+              _onPuzzleComplete();
             }
           }
 
@@ -279,7 +432,7 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
     currentColor = null;
 
     if (_checkComplete()) {
-      _showWinDialog();
+      _onPuzzleComplete();
     }
     setState(() {});
   }
@@ -346,10 +499,38 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
     return true;
   }
 
-  void _showWinDialog() {
+  void _onPuzzleComplete() {
     if (gameComplete) return;
     gameComplete = true;
+    puzzlesSolved++;
 
+    // Check for level up (2 puzzles per level)
+    bool shouldLevelUp = false;
+    String levelUpMessage = '';
+
+    if (puzzlesSolved >= 2 && level < 7) {
+      int oldGridSize = gridSize;
+      level++;
+      shouldLevelUp = true;
+      levelUpMessage = 'Level $level: ${_getLevelDescription()}';
+      puzzlesSolved = 0;
+      _updateColorsForLevel();
+
+      // If grid size changed, show level up immediately
+      if (oldGridSize != gridSize) {
+        _showLevelUpDialog(levelUpMessage);
+        return;
+      }
+    }
+
+    if (shouldLevelUp) {
+      _showLevelUpDialog(levelUpMessage);
+    } else {
+      _showWinDialog();
+    }
+  }
+
+  void _showWinDialog() {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -360,9 +541,23 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
             '🎉 Great job!',
             style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
           ),
-          content: const Text(
-            'You connected all the colors!',
-            style: TextStyle(fontSize: 18),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'You connected all the colors!',
+                style: TextStyle(fontSize: 18),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Level $level - Puzzle $puzzlesSolved/2',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.blue,
+                ),
+              ),
+            ],
           ),
           actions: [
             TextButton(
@@ -370,7 +565,7 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
                 Navigator.pop(context);
                 _initializeGame();
               },
-              child: const Text('Play Again'),
+              child: const Text('Next Puzzle'),
             ),
             TextButton(
               onPressed: () {
@@ -383,6 +578,60 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
         );
       },
     );
+  }
+
+  void _showLevelUpDialog(String message) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: Colors.amber[50],
+          title: const Text(
+            '⭐ Level Up!',
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Amazing work!',
+                style: TextStyle(fontSize: 18),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 10),
+              Text(
+                message,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.deepOrange,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _initializeGame();
+              },
+              child: const Text('Start Level'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _resetProgress() {
+    setState(() {
+      level = 1;
+      puzzlesSolved = 0;
+      _updateColorsForLevel();
+      _initializeGame();
+    });
   }
 
   @override
@@ -400,18 +649,37 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
           child: SafeArea(
             child: Row(
               children: [
-                // Left mascot
+                // Left mascot - moves based on grid size
                 Expanded(
                   child: Container(
                     padding: const EdgeInsets.all(20),
                     child: Center(
-                      child: Image.asset(
-                        _frogFrame == 0
-                            ? 'assets/images/eyeopenfrog.png'
-                            : _frogFrame == 1
-                            ? 'assets/images/closefrog.png'
-                            : 'assets/images/mouthfrog.png',
-                        fit: BoxFit.contain,
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          return OverflowBox(
+                            maxWidth: double.infinity,
+                            maxHeight: double.infinity,
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 500),
+                              curve: Curves.easeInOut,
+                              transform: Matrix4.translationValues(
+                                gridSize >= 6 ? -1 : (gridSize >= 5 ? 10 : 50),
+                                20,
+                                0,
+                              ),
+                              child: Image.asset(
+                                _frogFrame == 0
+                                    ? 'assets/images/eyeopenfrog.png'
+                                    : _frogFrame == 1
+                                    ? 'assets/images/closefrog.png'
+                                    : 'assets/images/mouthfrog.png',
+                                width: constraints.maxWidth * 1.5,
+                                height: constraints.maxHeight * 1.5,
+                                fit: BoxFit.contain,
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ),
                   ),
@@ -431,11 +699,15 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
                               constraints.maxWidth * 0.02,
                             ),
                             child: GameGrid(
+                              key: ValueKey(
+                                'grid-$gridSize-$level-$puzzlesSolved',
+                              ),
                               grid: grid,
                               gridSize: gridSize,
                               cellSize: cellSize,
                               paths: paths,
                               colorMap: colorMap,
+                              colors: colors,
                               onCellTouch: _handleCellTouch,
                               onDragEnd: _handleDragEnd,
                             ),
@@ -449,28 +721,57 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
                 Container(
                   width: 90,
                   padding: const EdgeInsets.all(8),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _buildStatItem(
-                        "Colors",
-                        "${paths.keys.where((color) => _isValidConnection(color)).length}/${colors.length}",
-                        Icons.palette,
-                      ),
-                      const SizedBox(height: 20),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.9),
-                          borderRadius: BorderRadius.circular(15),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _buildStatItem("Level", "$level", Icons.star),
+                        const SizedBox(height: 15),
+                        _buildStatItem(
+                          "Puzzle",
+                          "$puzzlesSolved/2",
+                          Icons.extension,
                         ),
-                        child: IconButton(
-                          onPressed: _initializeGame,
-                          icon: const Icon(Icons.refresh),
-                          color: Colors.green.shade700,
-                          tooltip: 'New Puzzle',
+                        const SizedBox(height: 15),
+                        _buildStatItem(
+                          "Colors",
+                          "${paths.keys.where((color) => _isValidConnection(color)).length}/${colors.length}",
+                          Icons.palette,
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 15),
+                        _buildStatItem(
+                          "Grid",
+                          "${gridSize}×$gridSize",
+                          Icons.grid_4x4,
+                        ),
+                        const SizedBox(height: 20),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.9),
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: IconButton(
+                            onPressed: _initializeGame,
+                            icon: const Icon(Icons.refresh),
+                            color: Colors.green.shade700,
+                            tooltip: 'New Puzzle',
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.9),
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: IconButton(
+                            onPressed: _resetProgress,
+                            icon: const Icon(Icons.restart_alt),
+                            color: Colors.orange.shade700,
+                            tooltip: 'Reset Progress',
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -487,6 +788,13 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.9),
         borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 3,
+            offset: const Offset(1, 1),
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -521,6 +829,7 @@ class GameGrid extends StatefulWidget {
   final double cellSize;
   final Map<String, List<Offset>> paths;
   final Map<String, Color> colorMap;
+  final List<String> colors;
   final Function(Offset) onCellTouch;
   final Function() onDragEnd;
 
@@ -531,6 +840,7 @@ class GameGrid extends StatefulWidget {
     required this.cellSize,
     required this.paths,
     required this.colorMap,
+    required this.colors,
     required this.onCellTouch,
     required this.onDragEnd,
   });
@@ -589,6 +899,7 @@ class _GameGridState extends State<GameGrid> {
                 widget.paths,
                 widget.colorMap,
                 widget.cellSize,
+                widget.colors,
               ),
             ),
             // Dots layer
@@ -604,7 +915,7 @@ class _GameGridState extends State<GameGrid> {
                 int y = index ~/ widget.gridSize;
                 String? color = widget.grid[y][x];
 
-                if (color != null) {
+                if (color != null && widget.colors.contains(color)) {
                   bool isConnected =
                       widget.paths.containsKey(color) &&
                       (widget.paths[color]!.first ==
@@ -665,8 +976,9 @@ class PathPainter extends CustomPainter {
   final Map<String, List<Offset>> paths;
   final Map<String, Color> colorMap;
   final double cellSize;
+  final List<String> colors;
 
-  PathPainter(this.paths, this.colorMap, this.cellSize);
+  PathPainter(this.paths, this.colorMap, this.cellSize, this.colors);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -676,7 +988,7 @@ class PathPainter extends CustomPainter {
       ..style = PaintingStyle.stroke;
 
     paths.forEach((color, points) {
-      if (points.length > 1) {
+      if (points.length > 1 && colors.contains(color)) {
         paint.color = colorMap[color]!.withOpacity(0.8);
         final path = Path();
         path.moveTo(
