@@ -14,7 +14,9 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
   List<int> flippedCards = [];
   bool canFlip = true;
   int matches = 0;
-  int moves = 0;
+  int setsCompleted = 0;
+  int timeRemaining = 30; // Start with 30 seconds
+  Timer? _gameTimer;
   late AnimationController _flipController;
   late AnimationController _matchController;
   late AudioPlayer _bgMusicPlayer;
@@ -28,6 +30,11 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
     'assets/images/ray.png',
     'assets/images/star.png',
     'assets/images/owl.png',
+  ];
+
+  final List<String> extraCardImages = [
+    'assets/images/sloth.png',
+    'assets/images/redpanda.png',
   ];
 
   @override
@@ -54,6 +61,7 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
     _flipController.dispose();
     _matchController.dispose();
     _mascotTimer?.cancel();
+    _gameTimer?.cancel();
     _bgMusicPlayer.dispose();
     super.dispose();
   }
@@ -73,17 +81,55 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
     cards.clear();
     flippedCards.clear();
     matches = 0;
-    moves = 0;
+    setsCompleted = 0;
     canFlip = true;
+    timeRemaining = 30;
 
-    List<String> gameImages = [...cardImages, ...cardImages];
-    gameImages.add('assets/images/pad.png'); // 9th unpaired card
-    gameImages.shuffle();
+    _gameTimer?.cancel();
+    _startGameTimer();
 
-    for (int i = 0; i < 9; i++) {
-      cards.add(GameCard(id: i, imagePath: gameImages[i]));
+    _setupCards();
+  }
+
+  void _setupCards() {
+    cards.clear();
+
+    if (setsCompleted < 3) {
+      // 3x3 grid with one unpaired card
+      List<String> gameImages = [...cardImages, ...cardImages];
+      gameImages.add('assets/images/pad.png'); // 9th unpaired card
+      gameImages.shuffle();
+
+      for (int i = 0; i < 9; i++) {
+        cards.add(GameCard(id: i, imagePath: gameImages[i]));
+      }
+    } else {
+      // 4x3 grid (12 cards) - all paired, no unpaired card
+      List<String> allImages = [...cardImages, ...extraCardImages];
+      List<String> gameImages = [...allImages, ...allImages];
+      gameImages.shuffle();
+
+      for (int i = 0; i < 12; i++) {
+        cards.add(GameCard(id: i, imagePath: gameImages[i]));
+      }
     }
+
     setState(() {});
+  }
+
+  void _startGameTimer() {
+    _gameTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted) {
+        setState(() {
+          timeRemaining--;
+        });
+
+        if (timeRemaining <= 0) {
+          timer.cancel();
+          _showGameOverDialog();
+        }
+      }
+    });
   }
 
   Future<void> _playBackgroundMusic() async {
@@ -105,7 +151,6 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
     });
 
     if (flippedCards.length == 2) {
-      moves++;
       _checkForMatch();
     }
   }
@@ -121,12 +166,14 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
           cards[flippedCards[0]].isMatched = true;
           cards[flippedCards[1]].isMatched = true;
           matches++;
+          timeRemaining += 5; // Add 5 seconds for each match
         });
 
         _matchController.forward().then((_) => _matchController.reset());
 
-        if (matches == 4) {
-          _showWinDialog();
+        int requiredMatches = setsCompleted < 3 ? 4 : 6;
+        if (matches == requiredMatches) {
+          _onSetCompleted();
         }
       } else {
         setState(() {
@@ -140,7 +187,21 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
     });
   }
 
-  void _showWinDialog() {
+  void _onSetCompleted() {
+    setsCompleted++;
+
+    if (setsCompleted == 3) {
+      // Completed 3 sets of 3x3, now move to 4x3
+      _gameTimer?.cancel();
+      _showLevelUpDialog();
+    } else {
+      // Continue with another 3x3 set
+      _gameTimer?.cancel();
+      _showNextSetDialog();
+    }
+  }
+
+  void _showNextSetDialog() {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -148,19 +209,123 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
         return AlertDialog(
           backgroundColor: Colors.green[50],
           title: const Text(
-            '🎉 Congratulations!',
+            '🎉 Set Complete!',
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Set $setsCompleted of 3 completed!',
+                style: const TextStyle(fontSize: 18),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Time Remaining: $timeRemaining seconds',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.blue,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                matches = 0;
+                _setupCards();
+                _startGameTimer();
+              },
+              child: const Text('Next Set'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showLevelUpDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: Colors.amber[50],
+          title: const Text(
+            '⭐ Level Up!',
             style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               const Text(
-                'You matched all the lily pads!',
+                'Great job! Now try the harder level!',
                 style: TextStyle(fontSize: 18),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                '4×3 Grid - All cards paired!',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.deepOrange,
+                ),
               ),
               const SizedBox(height: 10),
               Text(
-                'Moves: $moves',
+                'Time Remaining: $timeRemaining seconds',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.blue,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                matches = 0;
+                _setupCards();
+                _startGameTimer();
+              },
+              child: const Text('Start Hard Mode'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showGameOverDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: Colors.red[50],
+          title: const Text(
+            '⏰ Time\'s Up!',
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Game Over!', style: TextStyle(fontSize: 18)),
+              const SizedBox(height: 10),
+              Text(
+                'Sets Completed: $setsCompleted',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              Text(
+                'Matches: $matches',
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
@@ -214,8 +379,16 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
                           return OverflowBox(
                             maxWidth: double.infinity,
                             maxHeight: double.infinity,
-                            child: Transform.translate(
-                              offset: const Offset(50, 20),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 500),
+                              curve: Curves.easeInOut,
+                              transform: Matrix4.translationValues(
+                                setsCompleted >= 3
+                                    ? -3
+                                    : 50, // Move left when 12 cards
+                                20,
+                                0,
+                              ),
                               child: Image.asset(
                                 _frogFrame == 0
                                     ? 'assets/images/eyeopenfrog.png'
@@ -243,15 +416,25 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
                         double spacing = 6;
                         double maxWidth = constraints.maxWidth;
                         double maxHeight = constraints.maxHeight;
-                        double cardWidth = (maxWidth - (spacing * 2)) / 3;
-                        double cardHeight = (maxHeight - (spacing * 2)) / 3;
+
+                        int crossAxisCount = setsCompleted < 3 ? 3 : 4;
+                        int rows = setsCompleted < 3 ? 3 : 3;
+
+                        double cardWidth =
+                            (maxWidth - (spacing * (crossAxisCount - 1))) /
+                            crossAxisCount;
+                        double cardHeight =
+                            (maxHeight - (spacing * (rows - 1))) / rows;
                         double cardSize =
                             (cardWidth < cardHeight ? cardWidth : cardHeight) *
                             0.9;
                         cardSize = cardSize.clamp(50, 120);
 
-                        double gridWidth = (cardSize * 3) + (spacing * 2);
-                        double gridHeight = (cardSize * 3) + (spacing * 2);
+                        double gridWidth =
+                            (cardSize * crossAxisCount) +
+                            (spacing * (crossAxisCount - 1));
+                        double gridHeight =
+                            (cardSize * rows) + (spacing * (rows - 1));
 
                         return Center(
                           child: SizedBox(
@@ -261,7 +444,7 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
                               physics: const NeverScrollableScrollPhysics(),
                               gridDelegate:
                                   SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: 3,
+                                    crossAxisCount: crossAxisCount,
                                     crossAxisSpacing: spacing,
                                     mainAxisSpacing: spacing,
                                   ),
@@ -276,61 +459,46 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
                     ),
                   ),
                 ),
-                // Right sidebar
-                //mute/unmute button and stats
-                /* const SizedBox(height: 20),
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                  child: IconButton(
-                    icon: Icon(
-                      _isMuted ? Icons.volume_off : Icons.volume_up,
-                      color: Colors.green.shade700,
-                    ),
-                    tooltip: _isMuted ? 'Unmute Music' : 'Mute Music',
-                    onPressed: () async {
-                      setState(() => _isMuted = !_isMuted);
-                      if (_isMuted) {
-                        await _bgMusicPlayer.pause();
-                      } else {
-                        await _bgMusicPlayer.resume();
-                      }
-                    },
-                  ),
-                ), */
+                // Right sidebar - FIXED WITH SINGLECHILDSCROLLVIEW
                 Container(
                   width: 90,
                   padding: const EdgeInsets.all(8),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _buildSideStatItem(
-                        'Moves',
-                        moves.toString(),
-                        Icons.touch_app,
-                      ),
-                      const SizedBox(height: 20),
-                      _buildSideStatItem(
-                        'Matches',
-                        '$matches/4',
-                        Icons.favorite,
-                      ),
-                      const SizedBox(height: 20),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.9),
-                          borderRadius: BorderRadius.circular(15),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _buildSideStatItem(
+                          'Time',
+                          '$timeRemaining',
+                          Icons.timer,
                         ),
-                        child: IconButton(
-                          onPressed: _initializeGame,
-                          icon: const Icon(Icons.refresh),
-                          color: Colors.green.shade700,
-                          tooltip: 'Reset Game',
+                        const SizedBox(height: 20),
+                        _buildSideStatItem(
+                          'Sets',
+                          '$setsCompleted/3',
+                          Icons.grid_4x4,
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 20),
+                        _buildSideStatItem(
+                          'Matches',
+                          '$matches/${setsCompleted < 3 ? 4 : 6}',
+                          Icons.favorite,
+                        ),
+                        const SizedBox(height: 20),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.9),
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: IconButton(
+                            onPressed: _initializeGame,
+                            icon: const Icon(Icons.refresh),
+                            color: Colors.green.shade700,
+                            tooltip: 'Reset Game',
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
