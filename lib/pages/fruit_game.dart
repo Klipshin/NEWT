@@ -18,7 +18,7 @@ class _FruitGameState extends State<FruitGame> {
   int timeLeft = 60;
   bool gameActive = false;
   Timer? _timer;
-  Timer? _peacockTimer;
+  Timer? _mascotTimer;
 
   FruitType? currentFruit;
   Offset fruitPosition = Offset.zero;
@@ -26,15 +26,8 @@ class _FruitGameState extends State<FruitGame> {
   late AudioPlayer _bgMusicPlayer;
   bool _isMuted = false;
 
-  // Peacock animation states
-  int _peacockState = 0; // 0 = downP, 1 = halfP, 2 = upP
-  final List<String> _peacockImages = [
-    'assets/images/downP.png',
-    'assets/images/halfP.png',
-    'assets/images/upP.png',
-    'assets/images/halfP.png', // Add halfP again for the sequence
-  ];
-  final List<int> _peacockDurations = [4500, 4500, 4500, 4500];
+  // Frog mascot animation states (same as card game)
+  int _frogFrame = 0; // 0 = eyeopen, 1 = close, 2 = mouth
 
   final GlobalKey cherryBasketKey = GlobalKey();
   final GlobalKey blueberryBasketKey = GlobalKey();
@@ -47,7 +40,7 @@ class _FruitGameState extends State<FruitGame> {
   void initState() {
     super.initState();
     _initializeGame();
-    _startPeacockAnimation();
+    _startMascotAnimation();
     _bgMusicPlayer = AudioPlayer();
     _playBackgroundMusic();
   }
@@ -55,25 +48,20 @@ class _FruitGameState extends State<FruitGame> {
   @override
   void dispose() {
     _timer?.cancel();
-    _peacockTimer?.cancel();
+    _mascotTimer?.cancel();
     _bgMusicPlayer.dispose();
     super.dispose();
   }
 
-  void _startPeacockAnimation() {
-    _updatePeacockState();
-  }
-
-  void _updatePeacockState() {
-    setState(() {
-      _peacockState = (_peacockState + 1) % 4; // Changed to 4 for the sequence
+  void _startMascotAnimation() {
+    // Cycle frog images every 1 second (same as card game)
+    _mascotTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted) {
+        setState(() {
+          _frogFrame = (_frogFrame + 1) % 3; // 0 → 1 → 2 → 0
+        });
+      }
     });
-
-    // Schedule next state change
-    _peacockTimer = Timer(
-      Duration(milliseconds: _peacockDurations[_peacockState]),
-      _updatePeacockState,
-    );
   }
 
   void _initializeGame() {
@@ -124,9 +112,8 @@ class _FruitGameState extends State<FruitGame> {
 
     setState(() {
       currentFruit = random.nextBool() ? FruitType.cherry : FruitType.blueberry;
-      final randomX = 0.2 + random.nextDouble() * 0.6;
-      final randomY = 0.2 + random.nextDouble() * 0.5;
-      fruitPosition = Offset(randomX, randomY);
+      // Fixed position at the mascot location (left side)
+      fruitPosition = const Offset(0.31, 0.6); // Fixed position near the frog
       isDragging = false;
     });
   }
@@ -299,10 +286,10 @@ class _FruitGameState extends State<FruitGame> {
     final screenWidth = MediaQuery.of(context).size.width;
     final isTablet = screenWidth > 600;
 
-    final basketSize = isTablet ? 210.0 : 130.0;
-    final baseFruitSize = isTablet ? 70.0 : 50.0; // Reduced fruit size
-    final draggingFruitSize = isTablet ? 100.0 : 80.0; // Reduced dragging size
-    final peacockSize = isTablet ? 390.0 : 290.0;
+    final basketSize = isTablet ? 230.0 : 140.0;
+    final baseFruitSize = isTablet ? 70.0 : 50.0;
+    final draggingFruitSize = isTablet ? 100.0 : 80.0;
+    final frogSize = isTablet ? 310.0 : 210.0;
     final headerHeight = isTablet ? 100.0 : 80.0;
     final fontSize = isTablet ? 20.0 : 12.0;
 
@@ -315,12 +302,7 @@ class _FruitGameState extends State<FruitGame> {
           ),
         ),
         child: Container(
-          color: const Color.fromARGB(
-            255,
-            130,
-            138,
-            115,
-          ).withOpacity(0.4), // Same method as card game
+          color: const Color.fromARGB(255, 130, 138, 115).withOpacity(0.4),
           child: SafeArea(
             left: false,
             bottom: false,
@@ -352,21 +334,25 @@ class _FruitGameState extends State<FruitGame> {
                   ),
                 ),
 
-                // Peacock mascot with animation
+                // Frog mascot with animation (same as card game)
                 Positioned(
-                  left: isTablet ? 0 : 0,
-                  bottom: isTablet ? 2.5 : 1.5,
+                  left: isTablet ? 40 : 20,
+                  bottom: isTablet ? 20 : 17,
                   child: Image.asset(
-                    _peacockImages[_peacockState],
-                    width: peacockSize,
-                    height: peacockSize,
+                    _frogFrame == 0
+                        ? 'assets/images/open_no_pad.png'
+                        : _frogFrame == 1
+                        ? 'assets/images/close_no_pad.png'
+                        : 'assets/images/eyes_no_pad.png',
+                    width: frogSize,
+                    height: frogSize,
                     fit: BoxFit.contain,
                   ),
                 ),
 
                 // Cherry basket
                 Positioned(
-                  left: screenWidth * 0.47,
+                  left: screenWidth * 0.43,
                   bottom: isTablet ? 15 : 5,
                   child: _buildBasket(
                     key: cherryBasketKey,
@@ -386,7 +372,7 @@ class _FruitGameState extends State<FruitGame> {
                   ),
                 ),
 
-                // Draggable fruit - with reduced size
+                // Draggable fruit
                 if (currentFruit != null)
                   Positioned(
                     left:
@@ -430,7 +416,7 @@ class _FruitGameState extends State<FruitGame> {
                                 ),
                               ),
 
-                            // Main fruit - this is what actually scales
+                            // Main fruit
                             Container(
                               decoration: BoxDecoration(
                                 boxShadow: [
