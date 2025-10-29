@@ -1,10 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:audioplayers/audioplayers.dart';
-import '../animated_button.dart';
-import 'card_game.dart';
-import 'fruit_game.dart';
-import 'storybooks.dart';
-import 'connect_dots.dart';
+import 'package:newt_2/pages/storybooks.dart';
+import 'games_menu.dart';
 
 class LandingPage extends StatelessWidget {
   const LandingPage({super.key});
@@ -12,170 +8,97 @@ class LandingPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage("assets/images/swamp_new.png"),
-            fit: BoxFit.cover,
+      body: Stack(
+        children: [
+          //Background
+          Positioned.fill(
+            child: Image.asset(
+              'assets/images/landingv2.png',
+              fit: BoxFit.cover,
+            ),
           ),
-        ),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            // Define a base width (Pixel 9a width is around 412)
-            final baseWidth = 412.0;
-            final scaleFactor = constraints.maxWidth / baseWidth;
 
-            // Clamp the scale factor to prevent buttons from getting too large
-            final clampedScale = scaleFactor.clamp(0.8, 1.5);
+          //Frog mascot
+          Positioned(
+            left: -100,
+            bottom: -50,
+            child: Image.asset('assets/images/frogmascot.png', width: 430),
+          ),
 
-            // Calculate responsive offsets for larger screens
-            final isLargeScreen = constraints.maxWidth > 600;
-            final horizontalSpacing = isLargeScreen ? 1.2 : 1.0;
-            final verticalSpacing = isLargeScreen ? 1.1 : 1.0;
+          //Play
+          Positioned(
+            top:
+                MediaQuery.of(context).size.height *
+                0.58, // lowered 2x from center
+            left: 0,
+            right: 0,
+            child: GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const GamesMenu()),
+                );
+              },
+              child: Center(
+                child: Image.asset('assets/images/play.png', width: 250),
+              ),
+            ),
+          ),
 
-            return Stack(
-              children: [
-                // Treasure Chest - Left side (pushed more to the left on large screens)
-                Positioned(
-                  left: constraints.maxWidth * (0.06 / horizontalSpacing),
-                  top: constraints.maxHeight * (0.46 / verticalSpacing),
-                  child: AnimatedButton(
-                    imagePath: "assets/images/chest.png",
-                    width: 190 * clampedScale,
-                    height: 130 * clampedScale,
-                    onTap: () => _navigateToStoryBooksPage(context),
+          //Story Time
+          Positioned(
+            top: MediaQuery.of(context).size.height * 0.30,
+            right: MediaQuery.of(context).size.width * 0.09,
+            child: GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const StoryBooksPage(),
                   ),
-                ),
+                );
+              },
+              child: Image.asset('assets/images/storytime.png', width: 220),
+            ),
+          ),
 
-                // Basket - Right side (pushed more to the right on large screens)
-                Positioned(
-                  right: constraints.maxWidth * (0.024 / horizontalSpacing),
-                  top: constraints.maxHeight * (0.45 / verticalSpacing),
-                  child: AnimatedButton(
-                    imagePath: "assets/images/basket.png",
-                    width: 180 * clampedScale,
-                    height: 100 * clampedScale,
-                    onTap: () => _navigateToFruitGame(context),
-                  ),
-                ),
+          //Close
+          Positioned(
+            top: 20,
+            right: 20,
+            child: GestureDetector(
+              onTap: () {
+                // TODO: Exit or close
+              },
+              child: Image.asset('assets/images/close.png', width: 40),
+            ),
+          ),
 
-                // Rocks - Center-right (adjusted spacing)
-                Positioned(
-                  right: constraints.maxWidth * (0.235 * horizontalSpacing),
-                  top: constraints.maxHeight * (0.445 / verticalSpacing),
-                  child: AnimatedButton(
-                    imagePath: "assets/images/rocks.png",
-                    width: 150 * clampedScale,
-                    height: 80 * clampedScale,
-                    onTap: () => _navigateToPage(context, "Rocks"),
-                  ),
-                ),
+          //Sound
+          Positioned(
+            bottom: 25,
+            right: 90,
+            child: GestureDetector(
+              onTap: () {
+                // TODO: Toggle sound
+              },
+              child: Image.asset('assets/images/volume.png', width: 55),
+            ),
+          ),
 
-                // Lily Flower - Center (adjusted spacing)
-                Positioned(
-                  left: constraints.maxWidth * (0.48 * horizontalSpacing),
-                  top: constraints.maxHeight * (0.580 * verticalSpacing),
-                  child: AnimatedButton(
-                    imagePath: "assets/images/lilyflower.png",
-                    width: 110 * clampedScale,
-                    height: 110 * clampedScale,
-                    onTap: () => _navigateToCardGame(context),
-                  ),
-                ),
-
-                // Frog (adjusted spacing)
-                Positioned(
-                  left: constraints.maxWidth * (0.285 * horizontalSpacing),
-                  top: constraints.maxHeight * (0.651 * verticalSpacing),
-                  child: AnimatedButton(
-                    imagePath: "assets/images/frog.png",
-                    width: 100 * clampedScale,
-                    height: 64 * clampedScale,
-                    onTap: () => _navigateToConnectDotsGame(context),
-                  ),
-                ),
-
-                // Welcome text at the top
-                Positioned(
-                  top: constraints.maxHeight * 0.1,
-                  left: 0,
-                  right: 0,
-                  child: Center(
-                    child: Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 20 * clampedScale,
-                        vertical: 10 * clampedScale,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.4),
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      child: Text(
-                        "NEWT",
-                        style: TextStyle(
-                          fontSize: 24 * clampedScale,
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          shadows: const [
-                            Shadow(
-                              offset: Offset(1, 1),
-                              blurRadius: 3,
-                              color: Colors.black,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-
-                // Bush Tree Border (Foreground Overlay)
-                Positioned.fill(
-                  child: IgnorePointer(
-                    child: Image.asset(
-                      "assets/images/foreground_new.png",
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
+          //Settings
+          Positioned(
+            bottom: 25,
+            right: 25,
+            child: GestureDetector(
+              onTap: () {
+                // TODO: Open settings
+              },
+              child: Image.asset('assets/images/settings.png', width: 55),
+            ),
+          ),
+        ],
       ),
     );
-  }
-
-  void _navigateToPage(BuildContext context, String pageName) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Navigating to $pageName page...'),
-        duration: const Duration(seconds: 1),
-      ),
-    );
-  }
-
-  void _navigateToCardGame(BuildContext context) {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (context) => const CardGame()));
-  }
-
-  void _navigateToFruitGame(BuildContext context) {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (context) => const FruitGame()));
-  }
-
-  void _navigateToStoryBooksPage(BuildContext context) {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (context) => const StoryBooksPage()));
-  }
-
-  void _navigateToConnectDotsGame(BuildContext context) {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (context) => const ConnectDotsGame()));
   }
 }
