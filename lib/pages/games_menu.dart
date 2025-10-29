@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'card_game.dart';
+import 'fruit_game.dart';
+import 'connect_dots.dart';
+import 'animal_sounds.dart';
+import 'landing_page.dart';
 
 class GamesMenu extends StatefulWidget {
   const GamesMenu({super.key});
@@ -9,9 +13,7 @@ class GamesMenu extends StatefulWidget {
 }
 
 class _GamesMenuState extends State<GamesMenu> {
-  final PageController _pageController = PageController(
-    viewportFraction: 0.55,
-  ); // 👈 adds side space
+  final PageController _pageController = PageController(viewportFraction: 0.55);
   double currentPage = 0;
 
   final List<String> gameImages = const [
@@ -41,10 +43,35 @@ class _GamesMenuState extends State<GamesMenu> {
     super.dispose();
   }
 
+  void _handleGameTap(String image) {
+    if (image.contains('flip_a_card')) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const CardGame()),
+      );
+    } else if (image.contains('fruits_basket')) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const FruitGame()),
+      );
+    } else if (image.contains('connect_the_dots')) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const ConnectDotsGame()),
+      );
+    } else if (image.contains('animal_sounds')) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const AnimalSoundsQuiz()),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Stack(
+        clipBehavior: Clip.none,
         children: [
           // 🌿 Background
           Positioned.fill(
@@ -56,68 +83,72 @@ class _GamesMenuState extends State<GamesMenu> {
             ),
           ),
 
-          // 🔙 Back button
-          Positioned(
-            top: 40,
-            left: 20,
-            child: GestureDetector(
-              onTap: () => Navigator.pop(context),
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.8),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.arrow_back, size: 28),
-              ),
-            ),
-          ),
+          // 🎠 Carousel (placed below)
+          Positioned.fill(
+            child: Center(
+              child: PageView.builder(
+                controller: _pageController,
+                itemCount: gameImages.length,
+                itemBuilder: (context, index) {
+                  final double distance = (currentPage - index).abs();
+                  final double scale = 1 - distance * 0.25;
+                  final double opacity = 1 - distance * 0.4;
 
-          // 🎠 Carousel (no shadow)
-          Center(
-            child: PageView.builder(
-              controller: _pageController,
-              itemCount: gameImages.length,
-              itemBuilder: (context, index) {
-                final double distance = (currentPage - index).abs();
-                final double scale = 1 - distance * 0.25; // smaller on sides
-                final double opacity = 1 - distance * 0.4;
-
-                return Transform.scale(
-                  scale: scale.clamp(0.8, 1.0),
-                  child: Opacity(
-                    opacity: opacity.clamp(0.5, 1.0),
-                    child: GestureDetector(
-                      onTap: () {
-                        if (gameImages[index].contains('flip_a_card')) {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const CardGame(),
+                  return Transform.scale(
+                    scale: scale.clamp(0.8, 1.0),
+                    child: Opacity(
+                      opacity: opacity.clamp(0.5, 1.0),
+                      child: GestureDetector(
+                        onTap: () => _handleGameTap(gameImages[index]),
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 40,
+                          ),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(20),
+                            child: Image.asset(
+                              gameImages[index],
+                              fit: BoxFit.contain,
                             ),
-                          );
-                        }
-                      },
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 40,
-                        ),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(20),
-                          child: Image.asset(
-                            gameImages[index],
-                            fit: BoxFit.contain, // keep original size
                           ),
                         ),
                       ),
                     ),
+                  );
+                },
+              ),
+            ),
+          ),
+
+          // 🔙 Back button (always on top, clickable)
+          Positioned(
+            top: 40,
+            left: 20,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(50),
+                onTap: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const LandingPage(),
+                    ),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.8),
+                    shape: BoxShape.circle,
                   ),
-                );
-              },
+                  child: const Icon(Icons.arrow_back, size: 28),
+                ),
+              ),
             ),
           ),
         ],
