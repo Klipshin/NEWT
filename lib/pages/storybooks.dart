@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'the_red_ball.dart';
 import 'the_busy_ant.dart';
+import 'landing_page.dart'; // 👈 ensure this exists
 
 class StoryBooksPage extends StatelessWidget {
   const StoryBooksPage({super.key});
@@ -18,27 +19,18 @@ class StoryBooksPage extends StatelessWidget {
     return Scaffold(
       body: Stack(
         children: [
-          // 🖼 Background Image (Full Screen)
+          // 🖼 Background
           Positioned.fill(
-            child: Image.asset('assets/images/stories.png', fit: BoxFit.cover),
-          ),
-
-          // 🔙 Previous Button
-          Positioned(
-            top: 40,
-            left: 15,
-            child: GestureDetector(
-              onTap: () {
-                Navigator.pop(context);
-              },
+            child: Opacity(
+              opacity: 0.8, // 👈 80% visible
               child: Image.asset(
-                'assets/images/previous.png',
-                width: 35,
-                height: 35,
+                'assets/images/landingv2.png',
+                fit: BoxFit.cover,
               ),
             ),
           ),
 
+          // 📚 Storybook Carousel
           Center(
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -75,6 +67,30 @@ class StoryBooksPage extends StatelessWidget {
                     ),
                   );
                 }),
+              ),
+            ),
+          ),
+
+          // 🔙 Clickable Back Button — on top of everything
+          Positioned(
+            top: 40,
+            left: 20,
+            child: GestureDetector(
+              behavior:
+                  HitTestBehavior.opaque, // ✅ ensures tap always registers
+              onTap: () {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const LandingPage()),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.8),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.arrow_back, size: 28),
               ),
             ),
           ),
