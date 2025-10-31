@@ -4,6 +4,7 @@ import 'fruit_game.dart';
 import 'connect_dots.dart';
 import 'animal_sounds.dart';
 import 'landing_page.dart';
+import "guess_animal.dart";
 
 class GamesMenu extends StatefulWidget {
   const GamesMenu({super.key});
@@ -59,10 +60,10 @@ class _GamesMenuState extends State<GamesMenu> {
         context,
         MaterialPageRoute(builder: (context) => const ConnectDotsGame()),
       );
-    } else if (image.contains('animal_sounds')) {
+    } else if (image.contains('guess_the_animal')) {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => const AnimalSoundsQuiz()),
+        MaterialPageRoute(builder: (context) => const GuessAnimalGame()),
       );
     }
   }
