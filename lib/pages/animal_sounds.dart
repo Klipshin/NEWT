@@ -32,71 +32,72 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
     Animal(
       name: 'cat',
       soundPath: 'assets/sounds/cat.mp3',
-      cardPath: 'assets/images/cat_card.png',
+      cardPath: 'assets/images/cat_card2.png',
     ),
     Animal(
       name: 'cow',
       soundPath: 'assets/sounds/cow.mp3',
-      cardPath: 'assets/images/cow_card.png',
+      cardPath: 'assets/images/cow_card2.png',
     ),
     Animal(
       name: 'dog',
       soundPath: 'assets/sounds/dog.mp3',
-      cardPath: 'assets/images/dog_card.png',
+      cardPath: 'assets/images/dog_card2.png',
     ),
     Animal(
       name: 'rooster',
       soundPath: 'assets/sounds/rooster.mp3',
-      cardPath: 'assets/images/rooster_card.png',
+      cardPath: 'assets/images/rooster_card2.png',
     ),
     Animal(
       name: 'duck',
       soundPath: 'assets/sounds/duck.mp3',
-      cardPath: 'assets/images/duck_card.png',
+      cardPath: 'assets/images/duck_card2.png',
     ),
     Animal(
       name: 'lion',
       soundPath: 'assets/sounds/lion.mp3',
-      cardPath: 'assets/images/lion_card.png',
+      cardPath: 'assets/images/lion_card2.png',
     ),
     Animal(
       name: 'horse',
       soundPath: 'assets/sounds/horse.mp3',
-      cardPath: 'assets/images/horse_card.png',
+      cardPath: 'assets/images/horse_card2.png',
     ),
     Animal(
       name: 'sheep',
       soundPath: 'assets/sounds/sheep.mp3',
-      cardPath: 'assets/images/sheep_card.png',
+      cardPath: 'assets/images/sheep_card2.png',
     ),
     Animal(
       name: 'pig',
       soundPath: 'assets/sounds/pig.mp3',
-      cardPath: 'assets/images/pig_card.png',
+      cardPath: 'assets/images/pig_card2.png',
     ),
     Animal(
       name: 'owl',
       soundPath: 'assets/sounds/owl.mp3',
-      cardPath: 'assets/images/owl_card.png',
+      cardPath: 'assets/images/owl_card2.png',
     ),
     Animal(
       name: 'elephant',
       soundPath: 'assets/sounds/elephant.mp3',
-      cardPath: 'assets/images/elephant_card.png',
+      cardPath: 'assets/images/elephant_card2.png',
     ),
     Animal(
       name: 'crow',
       soundPath: 'assets/sounds/crow.mp3',
-      cardPath: 'assets/images/crow_card.png',
+      cardPath: 'assets/images/crow_card2.png',
     ),
     Animal(
       name: 'monkey',
       soundPath: 'assets/sounds/monkey.mp3',
-      cardPath: 'assets/images/monkey_card.png',
+      cardPath: 'assets/images/monkey_card2.png',
     ),
   ];
 
   Animal? currentAnimal;
+  Animal? previousAnimal;
   List<Animal> currentChoices = [];
 
   @override
@@ -171,9 +172,14 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
       hasAnswered = false;
       selectedAnswer = null;
 
-      // Pick random animal for the question
+      // Pick random animal for the question (avoid repeating previous animal)
       final random = Random();
-      currentAnimal = allAnimals[random.nextInt(allAnimals.length)];
+      List<Animal> availableAnimals = allAnimals
+          .where((a) => a.name != previousAnimal?.name)
+          .toList();
+
+      currentAnimal = availableAnimals[random.nextInt(availableAnimals.length)];
+      previousAnimal = currentAnimal;
 
       // Create choices (correct answer + 3 random wrong answers)
       currentChoices = [currentAnimal!];
@@ -371,82 +377,110 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               child: Column(
                 children: [
-                  // Top bar with stats
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _buildTopStatItem('⏱️ Time', '$timeRemaining s'),
-                      _buildTopStatItem('⭐ Score', '$currentScore'),
-                      _buildTopStatItem(
-                        '📝 Question',
-                        '${questionsAnswered + 1}/$totalQuestions',
-                      ),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.9),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: IconButton(
-                          onPressed: _initializeGame,
-                          icon: const Icon(Icons.refresh, size: 24),
-                          color: Colors.green.shade700,
-                          tooltip: 'Reset Game',
-                          padding: const EdgeInsets.all(12),
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Sound player section
+                  // Top bar with stats - combined into one
                   Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 14,
+                      horizontal: 16,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.9),
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 3,
+                          offset: const Offset(0, 1),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _buildStatText('⏱️', '$timeRemaining s'),
+                        Container(
+                          width: 1,
+                          height: 20,
+                          color: Colors.grey.shade300,
+                        ),
+                        _buildStatText('⭐', '$currentScore'),
+                        Container(
+                          width: 1,
+                          height: 20,
+                          color: Colors.grey.shade300,
+                        ),
+                        _buildStatText(
+                          '📝',
+                          '${questionsAnswered + 1}/$totalQuestions',
+                        ),
+                        Container(
+                          width: 1,
+                          height: 20,
+                          color: Colors.grey.shade300,
+                        ),
+                        IconButton(
+                          onPressed: _initializeGame,
+                          icon: const Icon(Icons.refresh, size: 20),
+                          color: Colors.green.shade700,
+                          tooltip: 'Reset Game',
+                          padding: const EdgeInsets.all(6),
+                          constraints: const BoxConstraints(),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // Sound player section - more compact
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
                     ),
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.95),
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withOpacity(0.15),
-                          blurRadius: 8,
+                          blurRadius: 6,
                           offset: const Offset(0, 2),
                         ),
                       ],
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         const Text(
-                          '🎵 Listen to the sound!',
+                          '🎵 Listen',
                           style: TextStyle(
-                            fontSize: 18,
+                            fontSize: 16,
                             fontWeight: FontWeight.bold,
                             color: Colors.green,
                           ),
                         ),
-                        const SizedBox(width: 20),
+                        const SizedBox(width: 12),
                         GestureDetector(
                           onTap: _playCurrentSound,
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 200),
-                            padding: const EdgeInsets.all(14),
+                            padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
                               color: isPlaying ? Colors.orange : Colors.green,
                               shape: BoxShape.circle,
                               boxShadow: [
                                 BoxShadow(
                                   color: Colors.black.withOpacity(0.2),
-                                  blurRadius: 6,
+                                  blurRadius: 4,
                                   offset: const Offset(0, 2),
                                 ),
                               ],
                             ),
                             child: Icon(
                               isPlaying ? Icons.volume_up : Icons.play_arrow,
-                              size: 32,
+                              size: 24,
                               color: Colors.white,
                             ),
                           ),
@@ -455,13 +489,13 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
                     ),
                   ),
 
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 12),
 
                   // Question text
                   const Text(
                     'Which animal makes this sound?',
                     style: TextStyle(
-                      fontSize: 20,
+                      fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
                       shadows: [
@@ -474,7 +508,7 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
                     ),
                   ),
 
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
 
                   // Animal choices - taking remaining space
                   Expanded(
@@ -505,42 +539,21 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
     );
   }
 
-  Widget _buildTopStatItem(String label, String value) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.9),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.15),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
+  Widget _buildStatText(String emoji, String value) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(emoji, style: const TextStyle(fontSize: 14)),
+        const SizedBox(width: 4),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+            color: Colors.green,
           ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              color: Colors.grey.shade700,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-              color: Colors.green,
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -583,28 +596,9 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
             ),
           ],
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Image.asset(animal.cardPath, fit: BoxFit.contain),
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text(
-                animal.name.toUpperCase(),
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: borderColor ?? Colors.green.shade800,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ],
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Image.asset(animal.cardPath, fit: BoxFit.contain),
         ),
       ),
     );
