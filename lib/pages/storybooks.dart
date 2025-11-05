@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
-import 'the_red_ball.dart';
-import 'the_busy_ant.dart';
-import 'landing_page.dart'; // 👈 ensure this exists
+import '1the_red_ball.dart';
+import '2the_busy_ant.dart';
+import '3the_rainbow_bridge.dart';
+import '4the_helpful_wind.dart';
+import '5the_little_seeds_journey.dart';
+import 'landing_page.dart';
 
 class StoryBooksPage extends StatelessWidget {
   const StoryBooksPage({super.key});
@@ -44,17 +47,23 @@ class StoryBooksPage extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 15),
                     child: GestureDetector(
                       onTap: () {
+                        Widget? page;
+
                         if (index == 0) {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => const StoryBookPage1(),
-                            ),
-                          );
+                          page = const StoryBookPage1();
                         } else if (index == 1) {
+                          page = const StoryBookPage2();
+                        } else if (index == 2) {
+                          page = const StoryBookPage3();
+                        } else if (index == 3) {
+                          page = const StoryBookPage4();
+                        } else if (index == 4) {
+                          page = const StoryBookPage5();
+                        }
+
+                        if (page != null) {
                           Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => const StoryBookPage2(),
-                            ),
+                            MaterialPageRoute(builder: (context) => page!),
                           );
                         }
                       },

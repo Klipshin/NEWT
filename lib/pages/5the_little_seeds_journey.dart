@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
 
-class StoryBookPage1 extends StatefulWidget {
-  const StoryBookPage1({super.key});
+class StoryBookPage5 extends StatefulWidget {
+  const StoryBookPage5({super.key});
 
   @override
-  State<StoryBookPage1> createState() => _StoryBookPage1State();
+  State<StoryBookPage5> createState() => _StoryBookPage5State();
 }
 
-class _StoryBookPage1State extends State<StoryBookPage1> {
+class _StoryBookPage5State extends State<StoryBookPage5> {
   final List<String> _pages = [
-    'assets/images/1-TheRedBall-1Title.png',
-    'assets/images/1-TheRedBall-P1.png',
-    'assets/images/1-TheRedBall-P2.png',
-    'assets/images/1-TheRedBall-P3.png',
-    'assets/images/1-TheRedBall-P4.png',
-    'assets/images/1-TheRedBall-P5.png',
+    'assets/images/5-TheLittleSeedsJourney-5Title.png',
+    'assets/images/5-TheLittleSeedsJourney-P1.png',
+    'assets/images/5-TheLittleSeedsJourney-P2.png',
+    'assets/images/5-TheLittleSeedsJourney-P3.png',
+    'assets/images/5-TheLittleSeedsJourney-P4.png',
+    'assets/images/5-TheLittleSeedsJourney-P5.png',
   ];
 
   int _currentPage = 0;
