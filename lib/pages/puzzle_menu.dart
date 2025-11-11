@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'games_menu.dart';
+import 'puzzle_game.dart'; // 1. Import the PuzzleGame widget
 
 class PuzzleMenu extends StatelessWidget {
   const PuzzleMenu({super.key});
@@ -39,7 +40,16 @@ class PuzzleMenu extends StatelessWidget {
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 15),
                     child: GestureDetector(
-                      onTap: () {},
+                      // 2. Add the correct onTap logic to navigate and pass the image path
+                      onTap: () {
+                        // Pass the 'path' of the clicked image to the PuzzleGame
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => PuzzleGame(imagePath: path),
+                          ),
+                        );
+                      },
                       child: Image.asset(
                         path,
                         width: 280,

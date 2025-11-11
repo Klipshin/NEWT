@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class PuzzleGame extends StatefulWidget {
-  const PuzzleGame({super.key});
+  final String imagePath;
+
+  const PuzzleGame({super.key, required this.imagePath});
 
   @override
   State<PuzzleGame> createState() => _PuzzleGameState();
@@ -30,9 +32,7 @@ class _PuzzleGameState extends State<PuzzleGame> {
       isLoading = true;
     });
 
-    final ByteData data = await rootBundle.load(
-      'assets/images/catdisney_test.png',
-    );
+    final ByteData data = await rootBundle.load(widget.imagePath);
     final Uint8List bytes = data.buffer.asUint8List();
     final ui.Codec codec = await ui.instantiateImageCodec(bytes);
     final ui.FrameInfo frameInfo = await codec.getNextFrame();
