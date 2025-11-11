@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:newt_2/pages/puzzle_menu.dart';
 import 'card_game.dart';
 import 'fruit_game.dart';
 import 'connect_dots.dart';
 import 'animal_sounds.dart';
 import 'landing_page.dart';
 import "guess_animal.dart";
+import 'number_trace.dart';
+import 'color_game.dart';
+import 'puzzle_menu.dart';
 
 class GamesMenu extends StatefulWidget {
   const GamesMenu({super.key});
@@ -22,7 +26,7 @@ class _GamesMenuState extends State<GamesMenu> {
     'assets/images/guess_the_animal.png',
     'assets/images/number_tracing.png',
     'assets/images/animal_sounds.png',
-    'assets/images/shape_sorter.png',
+    'assets/images/puzzle_piece.png',
     'assets/images/flip_a_card.png',
     'assets/images/color_fill.png',
     'assets/images/connect_the_dots.png',
@@ -64,6 +68,26 @@ class _GamesMenuState extends State<GamesMenu> {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => const GuessAnimalGame()),
+      );
+    } else if (image.contains('number_tracing')) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const NumberPathGame()),
+      );
+    } else if (image.contains('animal_sounds')) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const AnimalSoundsQuiz()),
+      );
+    } else if (image.contains('color_fill')) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const ColorFloodGame()),
+      );
+    } else if (image.contains('puzzle_piece')) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const PuzzleMenu()),
       );
     }
   }

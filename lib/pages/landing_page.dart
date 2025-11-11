@@ -47,8 +47,8 @@ class LandingPage extends StatelessWidget {
 
           //Story Time
           Positioned(
-            top: MediaQuery.of(context).size.height * 0.30,
-            right: MediaQuery.of(context).size.width * 0.09,
+            top: MediaQuery.of(context).size.height * 0.27,
+            right: MediaQuery.of(context).size.width * 0.05,
             child: GestureDetector(
               onTap: () {
                 Navigator.push(
@@ -58,7 +58,7 @@ class LandingPage extends StatelessWidget {
                   ),
                 );
               },
-              child: Image.asset('assets/images/storytime.png', width: 220),
+              child: Image.asset('assets/images/storytime.png', width: 210),
             ),
           ),
 

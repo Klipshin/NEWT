@@ -5,10 +5,10 @@ class StoryBookPage2 extends StatefulWidget {
   const StoryBookPage2({super.key});
 
   @override
-  State<StoryBookPage2> createState() => _StoryBookPage1State();
+  State<StoryBookPage2> createState() => _StoryBookPage2State();
 }
 
-class _StoryBookPage1State extends State<StoryBookPage2> {
+class _StoryBookPage2State extends State<StoryBookPage2> {
   final List<String> _pages = [
     'assets/images/2-TheBusyAnt-2Title.png',
     'assets/images/2-TheBusyAnt-P1.png',
