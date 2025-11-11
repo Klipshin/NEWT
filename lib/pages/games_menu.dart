@@ -5,6 +5,9 @@ import 'connect_dots.dart';
 import 'animal_sounds.dart';
 import 'landing_page.dart';
 import "guess_animal.dart";
+import 'number_trace.dart';
+import 'color_game.dart';
+import 'puzzle_game.dart';
 
 class GamesMenu extends StatefulWidget {
   const GamesMenu({super.key});
@@ -64,6 +67,26 @@ class _GamesMenuState extends State<GamesMenu> {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => const GuessAnimalGame()),
+      );
+    } else if (image.contains('number_tracing')) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const NumberPathGame()),
+      );
+    } else if (image.contains('animal_sounds')) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const AnimalSoundsQuiz()),
+      );
+    } else if (image.contains('color_fill')) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const ColorFloodGame()),
+      );
+    } else if (image.contains('shape_sorter')) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const PuzzleGame()),
       );
     }
   }

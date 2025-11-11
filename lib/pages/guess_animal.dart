@@ -298,7 +298,7 @@ class _GuessAnimalGameState extends State<GuessAnimalGame> {
       body: Container(
         decoration: const BoxDecoration(
           image: DecorationImage(
-            image: AssetImage("assets/images/swamp_new.png"),
+            image: AssetImage("assets/images/picnic_new.png"),
             fit: BoxFit.cover,
           ),
         ),

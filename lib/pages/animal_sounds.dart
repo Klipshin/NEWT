@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 
+//animal_sounds game
 class AnimalSoundsQuiz extends StatefulWidget {
   const AnimalSoundsQuiz({super.key});
 
@@ -371,7 +372,7 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
       body: Container(
         decoration: const BoxDecoration(
           image: DecorationImage(
-            image: AssetImage("assets/images/swamp_new.png"),
+            image: AssetImage("assets/images/picnic_new.png"),
             fit: BoxFit.cover,
           ),
         ),
