@@ -202,43 +202,51 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
   }
 
   void _showNextSetDialog() {
+    _gameTimer?.cancel();
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) {
-        return AlertDialog(
-          backgroundColor: Colors.green[50],
-          title: const Text(
-            '🎉 Set Complete!',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-          ),
+        return ThemedGameDialog(
+          title: 'ALL PAIRED UP! 🌟',
+          titleColor: Colors.cyan.shade300, // A new celebratory color
+          mascotImagePath:
+              'assets/images/mouthfrog.png', // Assuming a happy frog image
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Set $setsCompleted of 3 completed!',
-                style: const TextStyle(fontSize: 18),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                'Time Remaining: $timeRemaining seconds',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.blue,
+                'You found every creature pair! Get ready for a bigger swamp challenge.',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.cyan.shade50,
                 ),
+                textAlign: TextAlign.center,
               ),
             ],
           ),
           actions: [
-            TextButton(
+            _buildThemedButton(
+              context,
+              text: 'Start Next Round!',
               onPressed: () {
                 Navigator.of(context).pop();
                 matches = 0;
-                _setupCards();
+                _setupCards(); // Setup the next, larger card grid
                 _startGameTimer();
               },
-              child: const Text('Next Set'),
+              color: Colors.green.shade700,
+            ),
+            _buildThemedButton(
+              context,
+              text: 'Go to Menu',
+              onPressed: () {
+                Navigator.of(context).pop();
+                // Navigate back to the previous screen (menu)
+                Navigator.of(context).pop();
+              },
+              color: Colors.brown.shade700,
             ),
           ],
         );
@@ -247,53 +255,40 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
   }
 
   void _showLevelUpDialog() {
+    _gameTimer?.cancel();
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) {
-        return AlertDialog(
-          backgroundColor: Colors.amber[50],
-          title: const Text(
-            '⭐ Level Up!',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-          ),
+        return ThemedGameDialog(
+          title: 'LEVEL COMPLETE! 🎉',
+          titleColor: Colors.yellow.shade300,
+          mascotImagePath: 'assets/images/mouthfrog.png',
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'Great job! Now try the harder level!',
-                style: TextStyle(fontSize: 18),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 10),
-              const Text(
-                '4×3 Grid - All cards paired!',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.deepOrange,
-                ),
-              ),
-              const SizedBox(height: 10),
               Text(
-                'Time Remaining: $timeRemaining seconds',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.blue,
+                'Great job! The swamp gets bigger now.',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green.shade50,
                 ),
+                textAlign: TextAlign.center,
               ),
             ],
           ),
           actions: [
-            TextButton(
+            _buildThemedButton(
+              context,
+              text: 'Play Next Level!',
               onPressed: () {
                 Navigator.of(context).pop();
                 matches = 0;
                 _setupCards();
                 _startGameTimer();
               },
-              child: const Text('Start Hard Mode'),
+              color: Colors.orange.shade700,
             ),
           ],
         );
@@ -302,55 +297,124 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
   }
 
   void _showGameOverDialog() {
+    _gameTimer?.cancel();
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) {
-        return AlertDialog(
-          backgroundColor: Colors.red[50],
-          title: const Text(
-            '⏰ Time\'s Up!',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-          ),
+        return ThemedGameDialog(
+          title: 'GAME OVER 😔',
+          titleColor: Colors.red.shade300,
+          mascotImagePath: 'assets/images/closefrog.png',
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('Game Over!', style: TextStyle(fontSize: 18)),
-              const SizedBox(height: 10),
               Text(
-                'Sets Completed: $setsCompleted',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
+                'Time ran out! Try again!',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.red.shade200,
                 ),
-              ),
-              Text(
-                'Matches: $matches',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
+                textAlign: TextAlign.center,
               ),
             ],
           ),
           actions: [
-            TextButton(
+            _buildThemedButton(
+              context,
+              text: 'Play Again',
               onPressed: () {
                 Navigator.of(context).pop();
                 _initializeGame();
               },
-              child: const Text('Play Again'),
+              color: Colors.green.shade600,
             ),
-            TextButton(
+            _buildThemedButton(
+              context,
+              text: 'Back to Menu',
               onPressed: () {
                 Navigator.of(context).pop();
+                // Navigate back to the previous screen (menu)
                 Navigator.of(context).pop();
               },
-              child: const Text('Back to Menu'),
+              color: Colors.brown.shade700,
             ),
           ],
         );
       },
+    );
+  }
+
+  // Helper widget for a thematic button style (inside _CardGameState)
+  Widget _buildThemedButton(
+    BuildContext context, {
+    required String text,
+    required VoidCallback onPressed,
+    Color color = Colors.green,
+  }) {
+    return Expanded(
+      // Use Expanded to give buttons equal width
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 5.0),
+        child: ElevatedButton(
+          onPressed: onPressed,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: color,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15), // Bigger radius
+              side: BorderSide(
+                color: Colors.yellow.shade200,
+                width: 3,
+              ), // Stronger border
+            ),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 10,
+              vertical: 15, // Taller button
+            ),
+            elevation: 8, // More prominent shadow
+          ),
+          child: Text(
+            text,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 18, // Bigger font size
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Helper widget for stats in game over (inside _CardGameState)
+  Widget _buildStatRow(String label, String value, Color color) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        vertical: 2,
+      ), // REDUCED vertical padding (from 3)
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 16,
+              color: color,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -639,4 +703,151 @@ class GameCard {
     this.isFlipped = false,
     this.isMatched = false,
   });
+}
+
+// --- NEW/UPDATED Themed Game Dialog Widget (Big, Engaging, and Safe) ---
+class ThemedGameDialog extends StatelessWidget {
+  final String title;
+  final Widget content;
+  final List<Widget> actions;
+  final Color titleColor;
+  final String mascotImagePath;
+
+  const ThemedGameDialog({
+    super.key,
+    required this.title,
+    required this.content,
+    required this.actions,
+    this.titleColor = Colors.white,
+    this.mascotImagePath = 'assets/images/eyeopenfrog.png',
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+
+    // Make the dialog very large, but responsive
+    final dialogWidth = screenWidth * 0.8;
+    final dialogHeight = screenHeight * 0.85;
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      // Use AlertDialog-like padding to make it truly a popup
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: dialogWidth,
+          maxHeight: dialogHeight,
+        ),
+        child: Stack(
+          alignment: Alignment.topCenter,
+          children: [
+            // 1. The Main Content Box (Wooden/Mossy Look)
+            Container(
+              margin: const EdgeInsets.only(
+                top: 50,
+              ), // Space for the title banner
+              decoration: BoxDecoration(
+                // Dark, swampy gradient for the body
+                gradient: LinearGradient(
+                  colors: [Colors.brown.shade800, Colors.green.shade900],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+                borderRadius: BorderRadius.circular(25), // More rounded corners
+                border: Border.all(
+                  color: Colors.brown.shade600,
+                  width: 8,
+                ), // Thicker, wooden border
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.6),
+                    blurRadius: 15, // Deeper shadow
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  25,
+                  75,
+                  25,
+                  25,
+                ), // More generous padding
+                child: Column(
+                  mainAxisSize: MainAxisSize
+                      .max, // Take max height allowed by ConstrainedBox
+                  children: [
+                    // Content Area - Use SingleChildScrollView + Flexible for safety
+                    Flexible(child: SingleChildScrollView(child: content)),
+                    const SizedBox(height: 20),
+                    // Actions Row (buttons)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: actions,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // 2. The Title Header/Banner
+            Positioned(
+              top: 0,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 30,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade700, // Richer green for the banner
+                  borderRadius: BorderRadius.circular(50),
+                  border: Border.all(
+                    color: Colors.yellow.shade700,
+                    width: 4,
+                  ), // Bright border for pop
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.5),
+                      blurRadius: 8,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 28, // Bigger title for kids
+                    fontWeight: FontWeight.w900,
+                    color: titleColor,
+                    shadows: const [
+                      Shadow(
+                        offset: Offset(2, 2),
+                        blurRadius: 2.0,
+                        color: Colors.black,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // 3. The Mascot Image (Optional, kept positioned for theme)
+            Positioned(
+              top: 35, // Adjust vertical position to overlap banner slightly
+              right: 15,
+              child: Image.asset(
+                mascotImagePath,
+                width: 70, // Slightly bigger mascot
+                height: 70,
+                fit: BoxFit.contain,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
