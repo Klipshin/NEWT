@@ -1,9 +1,75 @@
 import 'package:flutter/material.dart';
 import 'package:newt_2/pages/storybooks.dart';
 import 'games_menu.dart';
+import 'package:audioplayers/audioplayers.dart';
 
-class LandingPage extends StatelessWidget {
+class LandingPage extends StatefulWidget {
   const LandingPage({super.key});
+
+  @override
+  State<LandingPage> createState() => _LandingPageState();
+}
+
+class _LandingPageState extends State<LandingPage> {
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  bool _isPlaying = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _playMusic();
+  }
+
+  void _playMusic() async {
+    await _audioPlayer.setReleaseMode(ReleaseMode.loop);
+    await _audioPlayer.play(AssetSource('sounds/card.mp3'));
+  }
+
+  void _toggleSound() {
+    setState(() {
+      if (_isPlaying) {
+        _audioPlayer.pause();
+        _isPlaying = false;
+      } else {
+        _audioPlayer.resume();
+        _isPlaying = true;
+      }
+    });
+  }
+
+  // --- NEW FUNCTION TO HANDLE NAVIGATION & SOUND ---
+  void _navigateToGames() async {
+    if (_isPlaying) _audioPlayer.pause(); // Pause music
+
+    // Go to the Games page and wait until we come back
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const GamesMenu()),
+    );
+
+    // When we come back, resume music (if it was on)
+    if (_isPlaying) _audioPlayer.resume();
+  }
+
+  // --- NEW FUNCTION TO HANDLE NAVIGATION & SOUND ---
+  void _navigateToStorybooks() async {
+    if (_isPlaying) _audioPlayer.pause(); // Pause music
+
+    // Go to the Storybooks page and wait until we come back
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const StoryBooksPage()),
+    );
+
+    // When we come back, resume music (if it was on)
+    if (_isPlaying) _audioPlayer.resume();
+  }
+
+  @override
+  void dispose() {
+    _audioPlayer.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -12,89 +78,68 @@ class LandingPage extends StatelessWidget {
         children: [
           //Background
           Positioned.fill(
-            child: Image.asset(
-              'assets/images/landingv2.png',
-              fit: BoxFit.cover,
+            child: Opacity(
+              // <--- WRAP WITH THIS WIDGET
+              opacity: 0.82, // <--- SET TO 80%
+              child: Image.asset(
+                'assets/images/landingv00.png',
+                fit: BoxFit.cover,
+              ),
             ),
           ),
 
-          //Frog mascot
+          // Logo (NEW)
           Positioned(
-            left: -100,
-            bottom: -50,
-            child: Image.asset('assets/images/frogmascot.png', width: 430),
+            top: 5, // At the top
+            left: 0, // Centered
+            right: 0, // Centered
+            child: Center(
+              child: Image.asset('assets/images/newt3.png', width: 350),
+            ),
           ),
 
           //Play
           Positioned(
             top:
                 MediaQuery.of(context).size.height *
-                0.58, // lowered 2x from center
+                0.56, // lowered 2x from center
             left: 0,
             right: 0,
             child: GestureDetector(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const GamesMenu()),
-                );
-              },
+              onTap: _navigateToGames, // <--- CHANGED to new function
               child: Center(
-                child: Image.asset('assets/images/play.png', width: 250),
+                child: Image.asset('assets/images/play.png', width: 220),
               ),
             ),
           ),
 
-          //Story Time
+          //Story Time (MOVED & ENLARGED)
           Positioned(
-            top: MediaQuery.of(context).size.height * 0.27,
-            right: MediaQuery.of(context).size.width * 0.05,
+            top: MediaQuery.of(context).size.height * 0.50,
+            left:
+                MediaQuery.of(context).size.width *
+                0.05, // <--- Positioned on the left
             child: GestureDetector(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const StoryBooksPage(),
-                  ),
-                );
-              },
-              child: Image.asset('assets/images/storytime.png', width: 210),
-            ),
-          ),
-
-          //Close
-          Positioned(
-            top: 20,
-            right: 20,
-            child: GestureDetector(
-              onTap: () {
-                // TODO: Exit or close
-              },
-              child: Image.asset('assets/images/close.png', width: 40),
+              onTap: _navigateToStorybooks, // <--- CHANGED to new function
+              child: Image.asset('assets/images/storytime0.png', width: 200),
             ),
           ),
 
           //Sound
           Positioned(
             bottom: 25,
-            right: 90,
-            child: GestureDetector(
-              onTap: () {
-                // TODO: Toggle sound
-              },
-              child: Image.asset('assets/images/volume.png', width: 55),
-            ),
-          ),
-
-          //Settings
-          Positioned(
-            bottom: 25,
             right: 25,
             child: GestureDetector(
-              onTap: () {
-                // TODO: Open settings
-              },
-              child: Image.asset('assets/images/settings.png', width: 55),
+              onTap: _toggleSound,
+              // --- THIS IS THE CORRECT PLACEMENT ---
+              // The ColorFiltered widget ONLY wraps the Image.asset
+              child: ColorFiltered(
+                colorFilter: ColorFilter.mode(
+                  _isPlaying ? Colors.transparent : Colors.grey,
+                  BlendMode.saturation,
+                ),
+                child: Image.asset('assets/images/volume.png', width: 55),
+              ),
             ),
           ),
         ],
