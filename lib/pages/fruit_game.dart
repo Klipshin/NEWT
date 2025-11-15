@@ -11,7 +11,7 @@ class FruitGame extends StatefulWidget {
   State<FruitGame> createState() => _FruitGameState();
 }
 
-class _FruitGameState extends State<FruitGame> {
+class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
   int cherryCount = 0;
   int blueberryCount = 0;
   int totalScore = 0;
@@ -25,6 +25,12 @@ class _FruitGameState extends State<FruitGame> {
   bool isDragging = false;
   late AudioPlayer _bgMusicPlayer;
   bool _isMuted = false;
+
+  // Poof animation controller
+  late AnimationController _poofController;
+  late Animation<double> _poofScale;
+  late Animation<double> _poofOpacity;
+  bool showPoof = false;
 
   // Frog mascot animation states (same as card game)
   int _frogFrame = 0; // 0 = eyeopen, 1 = close, 2 = mouth
@@ -43,6 +49,33 @@ class _FruitGameState extends State<FruitGame> {
     _startMascotAnimation();
     _bgMusicPlayer = AudioPlayer();
     _playBackgroundMusic();
+    _setupPoofAnimation();
+  }
+
+  void _setupPoofAnimation() {
+    _poofController = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
+
+    _poofScale = Tween<double>(
+      begin: 0.0,
+      end: 1.5,
+    ).animate(CurvedAnimation(parent: _poofController, curve: Curves.easeOut));
+
+    _poofOpacity = Tween<double>(
+      begin: 1.0,
+      end: 0.0,
+    ).animate(CurvedAnimation(parent: _poofController, curve: Curves.easeIn));
+
+    _poofController.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        setState(() {
+          showPoof = false;
+        });
+        _poofController.reset();
+      }
+    });
   }
 
   @override
@@ -50,6 +83,7 @@ class _FruitGameState extends State<FruitGame> {
     _timer?.cancel();
     _mascotTimer?.cancel();
     _bgMusicPlayer.dispose();
+    _poofController.dispose();
     super.dispose();
   }
 
@@ -115,7 +149,11 @@ class _FruitGameState extends State<FruitGame> {
       // Fixed position at the mascot location (left side)
       fruitPosition = const Offset(0.31, 0.6); // Fixed position near the frog
       isDragging = false;
+      showPoof = true;
     });
+
+    // Trigger poof animation
+    _poofController.forward();
   }
 
   void _onDragStart(DragStartDetails details) {
@@ -286,10 +324,10 @@ class _FruitGameState extends State<FruitGame> {
     final screenWidth = MediaQuery.of(context).size.width;
     final isTablet = screenWidth > 600;
 
-    final basketSize = isTablet ? 230.0 : 140.0;
+    final basketSize = isTablet ? 220.0 : 130.0;
     final baseFruitSize = isTablet ? 70.0 : 50.0;
     final draggingFruitSize = isTablet ? 100.0 : 80.0;
-    final frogSize = isTablet ? 310.0 : 210.0;
+    final frogSize = isTablet ? 240.0 : 140.0;
     final headerHeight = isTablet ? 100.0 : 80.0;
     final fontSize = isTablet ? 20.0 : 12.0;
 
@@ -352,7 +390,7 @@ class _FruitGameState extends State<FruitGame> {
 
                 // Cherry basket
                 Positioned(
-                  left: screenWidth * 0.43,
+                  left: screenWidth * 0.35,
                   bottom: isTablet ? 15 : 5,
                   child: _buildBasket(
                     key: cherryBasketKey,
@@ -363,7 +401,7 @@ class _FruitGameState extends State<FruitGame> {
 
                 // Blueberry basket
                 Positioned(
-                  right: screenWidth * 0.05,
+                  right: screenWidth * 0.11,
                   bottom: isTablet ? 15 : 5,
                   child: _buildBasket(
                     key: blueberryBasketKey,
@@ -371,6 +409,36 @@ class _FruitGameState extends State<FruitGame> {
                     size: basketSize,
                   ),
                 ),
+
+                // Poof animation
+                if (showPoof && currentFruit != null)
+                  Positioned(
+                    left: fruitPosition.dx * _getGameAreaSize().width - 75,
+                    top:
+                        fruitPosition.dy * _getGameAreaSize().height -
+                        75 +
+                        headerHeight,
+                    child: AnimatedBuilder(
+                      animation: _poofController,
+                      builder: (context, child) {
+                        return Opacity(
+                          opacity: _poofOpacity.value,
+                          child: Transform.scale(
+                            scale: _poofScale.value,
+                            child: Container(
+                              width: 150,
+                              height: 150,
+                              child: CustomPaint(
+                                painter: PoofPainter(
+                                  color: _getFruitGlowColor(),
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
 
                 // Draggable fruit
                 if (currentFruit != null)
@@ -481,10 +549,10 @@ class _FruitGameState extends State<FruitGame> {
 
   Widget _buildModernCounter(String emoji, int count, double fontSize) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.9),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(25),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.2),
@@ -496,12 +564,12 @@ class _FruitGameState extends State<FruitGame> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(emoji, style: TextStyle(fontSize: fontSize - 2)),
-          const SizedBox(width: 6),
+          Text(emoji, style: TextStyle(fontSize: fontSize + 8)),
+          const SizedBox(width: 10),
           Text(
             '$count',
             style: TextStyle(
-              fontSize: fontSize - 2,
+              fontSize: fontSize + 8,
               fontWeight: FontWeight.bold,
               color: Colors.black87,
             ),
@@ -592,6 +660,76 @@ class _FruitGameState extends State<FruitGame> {
       ],
     ),
   );
+}
+
+// Custom painter for the poof effect
+class PoofPainter extends CustomPainter {
+  final Color color;
+
+  PoofPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color.withOpacity(0.6)
+      ..style = PaintingStyle.fill;
+
+    final center = Offset(size.width / 2, size.height / 2);
+
+    // Draw multiple cloud-like circles to create poof effect
+    final random = Random(42); // Fixed seed for consistent appearance
+    for (int i = 0; i < 8; i++) {
+      final angle = (i * math.pi * 2) / 8;
+      final radius = size.width * 0.15;
+      final distance = size.width * 0.25;
+
+      final offset = Offset(
+        center.dx + math.cos(angle) * distance,
+        center.dy + math.sin(angle) * distance,
+      );
+
+      canvas.drawCircle(offset, radius, paint);
+    }
+
+    // Draw center circle
+    canvas.drawCircle(center, size.width * 0.2, paint);
+
+    // Add sparkles
+    final sparklePaint = Paint()
+      ..color = Colors.white.withOpacity(0.8)
+      ..style = PaintingStyle.fill;
+
+    for (int i = 0; i < 6; i++) {
+      final angle = (i * math.pi * 2) / 6 + math.pi / 6;
+      final distance = size.width * 0.35;
+      final sparkleOffset = Offset(
+        center.dx + math.cos(angle) * distance,
+        center.dy + math.sin(angle) * distance,
+      );
+
+      // Draw star shape
+      _drawStar(canvas, sparkleOffset, 4, sparklePaint);
+    }
+  }
+
+  void _drawStar(Canvas canvas, Offset center, double size, Paint paint) {
+    final path = Path();
+    for (int i = 0; i < 4; i++) {
+      final angle = (i * math.pi) / 2;
+      final x = center.dx + math.cos(angle) * size;
+      final y = center.dy + math.sin(angle) * size;
+      if (i == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
+    }
+    path.close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
 
 enum FruitType { cherry, blueberry }
