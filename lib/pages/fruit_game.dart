@@ -240,82 +240,128 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
-          '🎉 Game Over! 🎉',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Score: $totalScore',
-              style: const TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFFE94B3C),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildResult("🍒", cherryCount),
-                _buildResult("🫐", blueberryCount),
-              ],
-            ),
-          ],
-        ),
-        actions: [
-          Row(
+      builder: (context) {
+        return ThemedGameDialog(
+          title: 'GAME OVER! 🎉',
+          titleColor: totalScore > 0
+              ? Colors.yellow.shade300
+              : Colors.red.shade300,
+          mascotImagePath: totalScore > 0
+              ? 'assets/images/eyes_no_pad.png'
+              : 'assets/images/close_no_pad.png',
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    _initializeGame();
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4CAF50),
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                  ),
-                  child: const Text(
-                    'Play Again',
-                    style: TextStyle(fontSize: 18, color: Colors.white),
-                  ),
+              Text(
+                totalScore > 0
+                    ? 'Great job collecting fruits!'
+                    : 'Time ran out! Try again!',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green.shade50,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Final Score: $totalScore',
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.amber.shade300,
                 ),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFE94B3C),
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                  ),
-                  child: const Text(
-                    'Exit',
-                    style: TextStyle(fontSize: 18, color: Colors.white),
-                  ),
-                ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildResultColumn("🍒", cherryCount),
+                  _buildResultColumn("🫐", blueberryCount),
+                ],
               ),
             ],
+          ),
+          actions: [
+            _buildThemedButton(
+              context,
+              text: 'Play Again',
+              onPressed: () {
+                Navigator.of(context).pop();
+                _initializeGame();
+                _startGame();
+              },
+              color: Colors.green.shade600,
+            ),
+            _buildThemedButton(
+              context,
+              text: 'Back to Menu',
+              onPressed: () {
+                Navigator.of(context).pop();
+                Navigator.of(context).pop();
+              },
+              color: Colors.brown.shade700,
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildResultColumn(String emoji, int count) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.white.withOpacity(0.3), width: 2),
+      ),
+      child: Column(
+        children: [
+          Text(emoji, style: const TextStyle(fontSize: 40)),
+          const SizedBox(height: 8),
+          Text(
+            '$count',
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildResult(String emoji, int count) => Column(
-    children: [
-      Text(emoji, style: const TextStyle(fontSize: 40)),
-      const SizedBox(height: 5),
-      Text('$count', style: const TextStyle(fontSize: 24)),
-    ],
-  );
+  Widget _buildThemedButton(
+    BuildContext context, {
+    required String text,
+    required VoidCallback onPressed,
+    Color color = Colors.green,
+  }) {
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 5.0),
+        child: ElevatedButton(
+          onPressed: onPressed,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: color,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+              side: BorderSide(color: Colors.yellow.shade200, width: 3),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 15),
+            elevation: 8,
+          ),
+          child: Text(
+            text,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -354,10 +400,7 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // Score
                       _buildScoreDisplay(fontSize),
-
-                      // Fruit counters in the middle
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -366,13 +409,12 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
                           _buildModernCounter("🫐", blueberryCount, fontSize),
                         ],
                       ),
-                      // Timer
                       _buildTimerDisplay(fontSize),
                     ],
                   ),
                 ),
 
-                // Frog mascot with animation (same as card game)
+                // Frog mascot with animation
                 Positioned(
                   left: isTablet ? 40 : 20,
                   bottom: isTablet ? 20 : 17,
@@ -461,7 +503,6 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
                         child: Stack(
                           alignment: Alignment.center,
                           children: [
-                            // Subtle glow effect behind the fruit
                             if (isDragging)
                               Container(
                                 width: isDragging
@@ -483,8 +524,6 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
                                   ],
                                 ),
                               ),
-
-                            // Main fruit
                             Container(
                               decoration: BoxDecoration(
                                 boxShadow: [
@@ -676,8 +715,7 @@ class PoofPainter extends CustomPainter {
 
     final center = Offset(size.width / 2, size.height / 2);
 
-    // Draw multiple cloud-like circles to create poof effect
-    final random = Random(42); // Fixed seed for consistent appearance
+    final random = Random(42);
     for (int i = 0; i < 8; i++) {
       final angle = (i * math.pi * 2) / 8;
       final radius = size.width * 0.15;
@@ -691,10 +729,8 @@ class PoofPainter extends CustomPainter {
       canvas.drawCircle(offset, radius, paint);
     }
 
-    // Draw center circle
     canvas.drawCircle(center, size.width * 0.2, paint);
 
-    // Add sparkles
     final sparklePaint = Paint()
       ..color = Colors.white.withOpacity(0.8)
       ..style = PaintingStyle.fill;
@@ -707,7 +743,6 @@ class PoofPainter extends CustomPainter {
         center.dy + math.sin(angle) * distance,
       );
 
-      // Draw star shape
       _drawStar(canvas, sparkleOffset, 4, sparklePaint);
     }
   }
@@ -733,3 +768,131 @@ class PoofPainter extends CustomPainter {
 }
 
 enum FruitType { cherry, blueberry }
+
+// --- Themed Game Dialog Widget (Same as CardGame) ---
+class ThemedGameDialog extends StatelessWidget {
+  final String title;
+  final Widget content;
+  final List<Widget> actions;
+  final Color titleColor;
+  final String mascotImagePath;
+
+  const ThemedGameDialog({
+    super.key,
+    required this.title,
+    required this.content,
+    required this.actions,
+    this.titleColor = Colors.white,
+    this.mascotImagePath = 'assets/images/open_no_pad.png',
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+
+    final dialogWidth = screenWidth * 0.8;
+    final dialogHeight = screenHeight * 0.85;
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: dialogWidth,
+          maxHeight: dialogHeight,
+        ),
+        child: Stack(
+          alignment: Alignment.topCenter,
+          children: [
+            // Main Content Box
+            Container(
+              margin: const EdgeInsets.only(top: 50),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.brown.shade800, Colors.green.shade900],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+                borderRadius: BorderRadius.circular(25),
+                border: Border.all(color: Colors.brown.shade600, width: 8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.6),
+                    blurRadius: 15,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(25, 75, 25, 25),
+                child: Column(
+                  mainAxisSize: MainAxisSize.max,
+                  children: [
+                    Flexible(child: SingleChildScrollView(child: content)),
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: actions,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Title Header/Banner
+            Positioned(
+              top: 0,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 30,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade700,
+                  borderRadius: BorderRadius.circular(50),
+                  border: Border.all(color: Colors.yellow.shade700, width: 4),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.5),
+                      blurRadius: 8,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
+                    color: titleColor,
+                    shadows: const [
+                      Shadow(
+                        offset: Offset(2, 2),
+                        blurRadius: 2.0,
+                        color: Colors.black,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // Mascot Image
+            Positioned(
+              top: 35,
+              right: 15,
+              child: Image.asset(
+                mascotImagePath,
+                width: 70,
+                height: 70,
+                fit: BoxFit.contain,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
