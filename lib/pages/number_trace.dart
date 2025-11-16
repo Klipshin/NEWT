@@ -155,31 +155,42 @@ class _NumberPathGameState extends State<NumberPathGame>
       context: context,
       barrierDismissible: false,
       builder: (context) {
-        return AlertDialog(
-          backgroundColor: Colors.orange[50],
-          title: const Text(
-            '⏰ Time\'s Up!',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-          ),
-          content: const Text(
-            'Try again!',
-            style: TextStyle(fontSize: 18),
-            textAlign: TextAlign.center,
+        return ThemedGameDialog(
+          title: 'TIME\'S UP! ⏰',
+          titleColor: Colors.orange.shade300,
+          mascotImagePath: 'assets/images/closefrog.png',
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Try again!',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.orange.shade50,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
           ),
           actions: [
-            TextButton(
+            _buildThemedButton(
+              context,
+              text: 'Try Again',
               onPressed: () {
                 Navigator.pop(context);
                 _initializeGame();
               },
-              child: const Text('Try Again'),
+              color: Colors.green.shade700,
             ),
-            TextButton(
+            _buildThemedButton(
+              context,
+              text: 'Back to Menu',
               onPressed: () {
                 Navigator.pop(context);
                 Navigator.pop(context);
               },
-              child: const Text('Back to Menu'),
+              color: Colors.brown.shade700,
             ),
           ],
         );
@@ -203,13 +214,23 @@ class _NumberPathGameState extends State<NumberPathGame>
     int startY = rand.nextInt(gridSize);
     startPos = Offset(startX.toDouble(), startY.toDouble());
 
-    // Place END at opposite corner or far away
-    int endX = gridSize - 1 - startX;
-    int endY = gridSize - 1 - startY;
+    // Place END at a different position (guaranteed to be different from START)
+    int endX, endY;
+    do {
+      endX = rand.nextInt(gridSize);
+      endY = rand.nextInt(gridSize);
+    } while (endX == startX &&
+        endY == startY); // Ensure END is different from START
+
     endPos = Offset(endX.toDouble(), endY.toDouble());
+
+    print('START position: $startPos');
+    print('END position: $endPos');
 
     // Create a simple guaranteed solvable path
     List<Offset> solutionPath = _createSimplePath(startPos!, endPos!);
+
+    print('Solution path length: ${solutionPath.length}');
 
     // Assign ascending numbers to the path
     for (int i = 0; i < solutionPath.length; i++) {
@@ -217,15 +238,25 @@ class _NumberPathGameState extends State<NumberPathGame>
       grid[pos.dy.toInt()][pos.dx.toInt()] = i + 1;
     }
 
-    // Fill remaining cells with random numbers
+    // Fill remaining cells with random numbers (but DON'T overwrite START and END)
     for (int y = 0; y < gridSize; y++) {
       for (int x = 0; x < gridSize; x++) {
+        Offset currentPos = Offset(x.toDouble(), y.toDouble());
+        // Skip cells that are already part of the solution path
         if (grid[y][x] == null) {
           // Random number that could be part of alternate paths
           grid[y][x] = 1 + rand.nextInt(maxNumber);
         }
       }
     }
+
+    // Verify START and END are set
+    print(
+      'Grid at START (${startPos!.dx.toInt()}, ${startPos!.dy.toInt()}): ${grid[startPos!.dy.toInt()][startPos!.dx.toInt()]}',
+    );
+    print(
+      'Grid at END (${endPos!.dx.toInt()}, ${endPos!.dy.toInt()}): ${grid[endPos!.dy.toInt()][endPos!.dx.toInt()]}',
+    );
   }
 
   List<Offset> _createSimplePath(Offset start, Offset end) {
@@ -339,6 +370,7 @@ class _NumberPathGameState extends State<NumberPathGame>
 
     bool shouldLevelUp = false;
     String levelUpMessage = '';
+    bool gridSizeChanged = false;
 
     if (puzzlesSolved >= 2 && level < 6) {
       int oldGridSize = gridSize;
@@ -348,14 +380,14 @@ class _NumberPathGameState extends State<NumberPathGame>
       puzzlesSolved = 0;
       _updateDifficultyForLevel();
 
+      // Check if grid size changed
       if (oldGridSize != gridSize) {
-        _showLevelUpDialog(levelUpMessage);
-        return;
+        gridSizeChanged = true;
       }
     }
 
     if (shouldLevelUp) {
-      _showLevelUpDialog(levelUpMessage);
+      _showLevelUpDialog(levelUpMessage, gridSizeChanged);
     } else {
       _showWinDialog();
     }
@@ -366,41 +398,52 @@ class _NumberPathGameState extends State<NumberPathGame>
       context: context,
       barrierDismissible: false,
       builder: (context) {
-        return AlertDialog(
-          backgroundColor: Colors.green[50],
-          title: const Text(
-            '🎉 Excellent!',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-          ),
+        return ThemedGameDialog(
+          title: 'EXCELLENT! 🎉',
+          titleColor: Colors.cyan.shade300,
+          mascotImagePath: 'assets/images/mouthfrog.png',
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('You found the path!', style: TextStyle(fontSize: 18)),
-              const SizedBox(height: 10),
+              Text(
+                'You found the path!',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.cyan.shade50,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 15),
               Text(
                 'Level $level - Puzzle $puzzlesSolved/2',
-                style: const TextStyle(
-                  fontSize: 16,
+                style: TextStyle(
+                  fontSize: 18,
                   fontWeight: FontWeight.w600,
-                  color: Colors.blue,
+                  color: Colors.yellow.shade200,
                 ),
+                textAlign: TextAlign.center,
               ),
             ],
           ),
           actions: [
-            TextButton(
+            _buildThemedButton(
+              context,
+              text: 'Next Puzzle',
               onPressed: () {
                 Navigator.pop(context);
                 _initializeGame();
               },
-              child: const Text('Next Puzzle'),
+              color: Colors.green.shade700,
             ),
-            TextButton(
+            _buildThemedButton(
+              context,
+              text: 'Back to Menu',
               onPressed: () {
                 Navigator.pop(context);
                 Navigator.pop(context);
               },
-              child: const Text('Back to Menu'),
+              color: Colors.brown.shade700,
             ),
           ],
         );
@@ -408,48 +451,98 @@ class _NumberPathGameState extends State<NumberPathGame>
     );
   }
 
-  void _showLevelUpDialog(String message) {
+  void _showLevelUpDialog(String message, bool gridSizeChanged) {
+    // If grid changed, generate new puzzle immediately before showing dialog
+    if (gridSizeChanged) {
+      // Clear game state and generate new grid
+      gameComplete = false;
+      currentPath.clear();
+      _generatePuzzle();
+      _startTimer();
+
+      // Force UI update
+      setState(() {});
+    }
+
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) {
-        return AlertDialog(
-          backgroundColor: Colors.amber[50],
-          title: const Text(
-            '⭐ Level Up!',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-          ),
+        return ThemedGameDialog(
+          title: 'LEVEL UP! ⭐',
+          titleColor: Colors.yellow.shade300,
+          mascotImagePath: 'assets/images/mouthfrog.png',
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
+              Text(
                 'Amazing work!',
-                style: TextStyle(fontSize: 18),
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green.shade50,
+                ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 15),
               Text(
                 message,
-                style: const TextStyle(
-                  fontSize: 16,
+                style: TextStyle(
+                  fontSize: 18,
                   fontWeight: FontWeight.w600,
-                  color: Colors.deepOrange,
+                  color: Colors.orange.shade200,
                 ),
                 textAlign: TextAlign.center,
               ),
             ],
           ),
           actions: [
-            TextButton(
+            _buildThemedButton(
+              context,
+              text: 'Start Level!',
               onPressed: () {
                 Navigator.pop(context);
-                _initializeGame();
+                if (!gridSizeChanged) {
+                  // Only generate new puzzle if grid size didn't change
+                  _initializeGame();
+                }
+                // Grid is already ready to play
               },
-              child: const Text('Continue'),
+              color: Colors.orange.shade700,
             ),
           ],
         );
       },
+    );
+  }
+
+  Widget _buildThemedButton(
+    BuildContext context, {
+    required String text,
+    required VoidCallback onPressed,
+    Color color = Colors.green,
+  }) {
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 5.0),
+        child: ElevatedButton(
+          onPressed: onPressed,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: color,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+              side: BorderSide(color: Colors.yellow.shade200, width: 3),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 15),
+            elevation: 8,
+          ),
+          child: Text(
+            text,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+          ),
+        ),
+      ),
     );
   }
 
@@ -765,9 +858,9 @@ class _NumberGameGridState extends State<NumberGameGrid> {
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
                       color: isStart
-                          ? Colors.green
+                          ? Colors.green.shade700
                           : isEnd
-                          ? Colors.red
+                          ? Colors.red.shade700
                           : Colors.grey.shade300,
                       width: isStart || isEnd ? 3 : 1,
                     ),
@@ -787,12 +880,12 @@ class _NumberGameGridState extends State<NumberGameGrid> {
                               Icon(
                                 Icons.play_arrow,
                                 color: Colors.green.shade700,
-                                size: widget.cellSize * 0.4,
+                                size: widget.cellSize * 0.35,
                               ),
                               Text(
                                 'START',
                                 style: TextStyle(
-                                  fontSize: widget.cellSize * 0.12,
+                                  fontSize: widget.cellSize * 0.1,
                                   fontWeight: FontWeight.bold,
                                   color: Colors.green.shade700,
                                 ),
@@ -806,12 +899,12 @@ class _NumberGameGridState extends State<NumberGameGrid> {
                               Icon(
                                 Icons.flag,
                                 color: Colors.red.shade700,
-                                size: widget.cellSize * 0.4,
+                                size: widget.cellSize * 0.35,
                               ),
                               Text(
                                 'END',
                                 style: TextStyle(
-                                  fontSize: widget.cellSize * 0.12,
+                                  fontSize: widget.cellSize * 0.1,
                                   fontWeight: FontWeight.bold,
                                   color: Colors.red.shade700,
                                 ),
@@ -873,6 +966,140 @@ class NumberPathPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(CustomPainter oldDelegate) => true;
+}
+
+// --- Themed Game Dialog Widget (Matching Card Game Style) ---
+class ThemedGameDialog extends StatelessWidget {
+  final String title;
+  final Widget content;
+  final List<Widget> actions;
+  final Color titleColor;
+  final String mascotImagePath;
+
+  const ThemedGameDialog({
+    super.key,
+    required this.title,
+    required this.content,
+    required this.actions,
+    this.titleColor = Colors.white,
+    this.mascotImagePath = 'assets/images/eyeopenfrog.png',
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+
+    // Make the dialog very large, but responsive
+    final dialogWidth = screenWidth * 0.8;
+    final dialogHeight = screenHeight * 0.85;
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: dialogWidth,
+          maxHeight: dialogHeight,
+        ),
+        child: Stack(
+          alignment: Alignment.topCenter,
+          children: [
+            // 1. The Main Content Box (Wooden/Mossy Look)
+            Container(
+              margin: const EdgeInsets.only(
+                top: 50,
+              ), // Space for the title banner
+              decoration: BoxDecoration(
+                // Dark, swampy gradient for the body
+                gradient: LinearGradient(
+                  colors: [Colors.brown.shade800, Colors.green.shade900],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+                borderRadius: BorderRadius.circular(25),
+                border: Border.all(color: Colors.brown.shade600, width: 8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.6),
+                    blurRadius: 15,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(25, 75, 25, 25),
+                child: Column(
+                  mainAxisSize: MainAxisSize.max,
+                  children: [
+                    // Content Area - Use SingleChildScrollView + Flexible for safety
+                    Flexible(child: SingleChildScrollView(child: content)),
+                    const SizedBox(height: 20),
+                    // Actions Row (buttons)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: actions,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // 2. The Title Header/Banner
+            Positioned(
+              top: 0,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 30,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade700,
+                  borderRadius: BorderRadius.circular(50),
+                  border: Border.all(color: Colors.yellow.shade700, width: 4),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.5),
+                      blurRadius: 8,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
+                    color: titleColor,
+                    shadows: const [
+                      Shadow(
+                        offset: Offset(2, 2),
+                        blurRadius: 2.0,
+                        color: Colors.black,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // 3. The Mascot Image
+            Positioned(
+              top: 35,
+              right: 15,
+              child: Image.asset(
+                mascotImagePath,
+                width: 70,
+                height: 70,
+                fit: BoxFit.contain,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 // Transition Video Player Widget
