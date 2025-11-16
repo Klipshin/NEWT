@@ -113,8 +113,9 @@ class _GamesMenuState extends State<GamesMenu> {
             child: Center(
               child: PageView.builder(
                 controller: _pageController,
-                itemCount: gameImages.length,
+                itemCount: 10000,
                 itemBuilder: (context, index) {
+                  final realIndex = index % gameImages.length;
                   final double distance = (currentPage - index).abs();
                   final double scale = 1 - distance * 0.25;
                   final double opacity = 1 - distance * 0.4;
@@ -124,7 +125,7 @@ class _GamesMenuState extends State<GamesMenu> {
                     child: Opacity(
                       opacity: opacity.clamp(0.5, 1.0),
                       child: GestureDetector(
-                        onTap: () => _handleGameTap(gameImages[index]),
+                        onTap: () => _handleGameTap(gameImages[realIndex]),
                         child: Container(
                           margin: const EdgeInsets.symmetric(
                             horizontal: 16,
@@ -136,7 +137,7 @@ class _GamesMenuState extends State<GamesMenu> {
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(20),
                             child: Image.asset(
-                              gameImages[index],
+                              gameImages[realIndex],
                               fit: BoxFit.contain,
                             ),
                           ),
