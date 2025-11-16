@@ -13,11 +13,41 @@ class LandingPage extends StatefulWidget {
 class _LandingPageState extends State<LandingPage> {
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isPlaying = true;
+  double _swayValue = -0.1;
+  bool _bounceUp = true;
 
   @override
   void initState() {
     super.initState();
     _playMusic();
+    _startSwaying();
+    _startBouncing();
+  }
+
+  void _startBouncing() {
+    Future.doWhile(() async {
+      await Future.delayed(Duration(milliseconds: 800));
+      if (mounted) {
+        setState(() {
+          _bounceUp = !_bounceUp;
+        });
+        return true;
+      }
+      return false;
+    });
+  }
+
+  void _startSwaying() {
+    Future.doWhile(() async {
+      await Future.delayed(Duration(milliseconds: 2500));
+      if (mounted) {
+        setState(() {
+          _swayValue = _swayValue == -0.1 ? 0.1 : -0.1;
+        });
+        return true;
+      }
+      return false;
+    });
   }
 
   void _playMusic() async {
@@ -100,15 +130,18 @@ class _LandingPageState extends State<LandingPage> {
 
           //Play
           Positioned(
-            top:
-                MediaQuery.of(context).size.height *
-                0.56, // lowered 2x from center
+            top: MediaQuery.of(context).size.height * 0.60,
             left: 0,
             right: 0,
-            child: GestureDetector(
-              onTap: _navigateToGames, // <--- CHANGED to new function
-              child: Center(
-                child: Image.asset('assets/images/play.png', width: 220),
+            child: AnimatedContainer(
+              duration: Duration(milliseconds: 800),
+              curve: Curves.easeInOut,
+              transform: Matrix4.translationValues(0, _bounceUp ? -10 : 0, 0),
+              child: GestureDetector(
+                onTap: _navigateToGames,
+                child: Center(
+                  child: Image.asset('assets/images/play.png', width: 220),
+                ),
               ),
             ),
           ),
@@ -116,29 +149,28 @@ class _LandingPageState extends State<LandingPage> {
           //Story Time (MOVED & ENLARGED)
           Positioned(
             top: MediaQuery.of(context).size.height * 0.50,
-            left:
-                MediaQuery.of(context).size.width *
-                0.05, // <--- Positioned on the left
-            child: GestureDetector(
-              onTap: _navigateToStorybooks, // <--- CHANGED to new function
-              child: Image.asset('assets/images/storytime0.png', width: 200),
+            left: MediaQuery.of(context).size.width * 0.05,
+            child: AnimatedRotation(
+              turns: _swayValue / (2 * 3.14159),
+              duration: Duration(milliseconds: 2500),
+              curve: Curves.easeInOut,
+              child: GestureDetector(
+                onTap: _navigateToStorybooks,
+                child: Image.asset('assets/images/storytime0.png', width: 200),
+              ),
             ),
           ),
-
           //Sound
           Positioned(
             bottom: 25,
             right: 25,
             child: GestureDetector(
               onTap: _toggleSound,
-              // --- THIS IS THE CORRECT PLACEMENT ---
-              // The ColorFiltered widget ONLY wraps the Image.asset
-              child: ColorFiltered(
-                colorFilter: ColorFilter.mode(
-                  _isPlaying ? Colors.transparent : Colors.grey,
-                  BlendMode.saturation,
-                ),
-                child: Image.asset('assets/images/volume.png', width: 55),
+              child: Image.asset(
+                _isPlaying
+                    ? 'assets/images/volume.png'
+                    : 'assets/images/volumeoff.png',
+                width: 55,
               ),
             ),
           ),

@@ -12,19 +12,19 @@ class GuessAnimalGame extends StatefulWidget {
 
 class _GuessAnimalGameState extends State<GuessAnimalGame> {
   final List<Animal> allAnimals = [
-    Animal(name: 'cat', cardPath: 'assets/images/cat_card2.png'),
-    Animal(name: 'cow', cardPath: 'assets/images/cow_card2.png'),
-    Animal(name: 'dog', cardPath: 'assets/images/dog_card2.png'),
-    Animal(name: 'rooster', cardPath: 'assets/images/rooster_card2.png'),
-    Animal(name: 'duck', cardPath: 'assets/images/duck_card2.png'),
-    Animal(name: 'lion', cardPath: 'assets/images/lion_card2.png'),
-    Animal(name: 'horse', cardPath: 'assets/images/horse_card2.png'),
-    Animal(name: 'sheep', cardPath: 'assets/images/sheep_card2.png'),
-    Animal(name: 'pig', cardPath: 'assets/images/pig_card2.png'),
-    Animal(name: 'owl', cardPath: 'assets/images/owl_card2.png'),
-    Animal(name: 'elephant', cardPath: 'assets/images/elephant_card2.png'),
-    Animal(name: 'crow', cardPath: 'assets/images/crow_card2.png'),
-    Animal(name: 'monkey', cardPath: 'assets/images/monkey_card2.png'),
+    Animal(name: 'cat', cardPath: 'assets/images/cat_card.png'),
+    Animal(name: 'cow', cardPath: 'assets/images/cow_card.png'),
+    Animal(name: 'dog', cardPath: 'assets/images/dog_card.png'),
+    Animal(name: 'rooster', cardPath: 'assets/images/rooster_card.png'),
+    Animal(name: 'duck', cardPath: 'assets/images/duck_card.png'),
+    Animal(name: 'lion', cardPath: 'assets/images/lion_card.png'),
+    Animal(name: 'horse', cardPath: 'assets/images/horse_card.png'),
+    Animal(name: 'sheep', cardPath: 'assets/images/sheep_card.png'),
+    Animal(name: 'pig', cardPath: 'assets/images/pig_card.png'),
+    Animal(name: 'owl', cardPath: 'assets/images/owl_card.png'),
+    Animal(name: 'elephant', cardPath: 'assets/images/elephant_card.png'),
+    Animal(name: 'crow', cardPath: 'assets/images/crow_card.png'),
+    Animal(name: 'monkey', cardPath: 'assets/images/monkey_card.png'),
   ];
 
   static const int choicesCount = 3;
