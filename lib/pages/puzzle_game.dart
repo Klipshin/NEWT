@@ -3,6 +3,169 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+// --- Helper Widget for Themed Dialog Buttons ---
+Widget _buildThemedButton(
+  BuildContext context, {
+  required String text,
+  required VoidCallback onPressed,
+  Color color = Colors.green,
+}) {
+  return Expanded(
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 5.0),
+      child: ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
+            side: BorderSide(color: Colors.yellow.shade200, width: 3),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 15),
+          elevation: 8,
+        ),
+        child: Text(
+          text,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+        ),
+      ),
+    ),
+  );
+}
+
+// --- Themed Game Dialog Widget ---
+class ThemedGameDialog extends StatelessWidget {
+  final String title;
+  final Widget content;
+  final List<Widget> actions;
+  final Color titleColor;
+  final String mascotImagePath;
+
+  const ThemedGameDialog({
+    super.key,
+    required this.title,
+    required this.content,
+    required this.actions,
+    this.titleColor = Colors.white,
+    this.mascotImagePath = 'assets/images/eyeopenfrog.png',
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+
+    final dialogWidth = screenWidth * 0.8;
+    final dialogHeight = screenHeight * 0.85;
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: dialogWidth,
+          maxHeight: dialogHeight,
+        ),
+        child: Stack(
+          alignment: Alignment.topCenter,
+          children: [
+            // 1. The Main Content Box (Wooden/Mossy Look)
+            Container(
+              margin: const EdgeInsets.only(
+                top: 50,
+              ), // Space for the title banner
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.brown.shade800, Colors.green.shade900],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+                borderRadius: BorderRadius.circular(25),
+                border: Border.all(color: Colors.brown.shade600, width: 8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.6),
+                    blurRadius: 15,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(25, 75, 25, 25),
+                child: Column(
+                  mainAxisSize: MainAxisSize.max,
+                  children: [
+                    // Content Area
+                    Expanded(child: Center(child: content)),
+                    const SizedBox(height: 20),
+                    // Actions Row (buttons)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: actions,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // 2. The Title Header/Banner
+            Positioned(
+              top: 0,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 30,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade700,
+                  borderRadius: BorderRadius.circular(50),
+                  border: Border.all(color: Colors.yellow.shade700, width: 4),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.5),
+                      blurRadius: 8,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
+                    color: titleColor,
+                    shadows: const [
+                      Shadow(
+                        offset: Offset(2, 2),
+                        blurRadius: 2.0,
+                        color: Colors.black,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // 3. The Mascot Image
+            Positioned(
+              top: 35,
+              right: 15,
+              child: Image.asset(
+                mascotImagePath,
+                width: 70,
+                height: 70,
+                fit: BoxFit.contain,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class PuzzleGame extends StatefulWidget {
   final String imagePath;
 
@@ -94,45 +257,117 @@ class _PuzzleGameState extends State<PuzzleGame> {
     }
   }
 
+  // --- UPDATED DIALOG METHOD ---
   void _showCompletionDialog() {
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) {
-        return AlertDialog(
-          backgroundColor: Colors.green[50],
-          title: const Text(
-            '🎉 Puzzle Complete!',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-          ),
-          content: const Text(
-            'Great job! You solved the puzzle!',
-            style: TextStyle(fontSize: 18),
-            textAlign: TextAlign.center,
+        return ThemedGameDialog(
+          title: 'PUZZLE SOLVED! 🧩',
+          titleColor: Colors.yellow.shade300,
+          mascotImagePath: 'assets/images/mouthfrog.png',
+          content: const Padding(
+            padding: EdgeInsets.symmetric(vertical: 25.0),
+            child: Text(
+              'Fantastic! You completed the image.',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Color.fromARGB(255, 230, 255, 230),
+              ),
+              textAlign: TextAlign.center,
+            ),
           ),
           actions: [
-            TextButton(
+            _buildThemedButton(
+              context,
+              text: 'Play Again',
               onPressed: () {
                 Navigator.of(context).pop();
                 _loadAndSliceImage();
               },
-              child: const Text('Play Again'),
+              color: Colors.green.shade700,
             ),
-            TextButton(
+            _buildThemedButton(
+              context,
+              text: 'Back to Menu',
               onPressed: () {
                 Navigator.of(context).pop();
                 Navigator.of(context).pop();
               },
-              child: const Text('Back to Menu'),
+              color: Colors.brown.shade700,
             ),
           ],
         );
       },
     );
   }
+  // --- END UPDATED DIALOG METHOD ---
 
   void _resetPuzzle() {
     _loadAndSliceImage();
+  }
+
+  // helper used by right sidebar buttons
+  void _initializeForNewGame() {
+    setState(() {
+      gridSize = gridSize; // keep same grid size
+      _loadAndSliceImage();
+    });
+  }
+
+  void _resetProgress() {
+    setState(() {
+      gridSize = 3;
+      piecesPlaced = 0;
+      _loadAndSliceImage();
+    });
+  }
+
+  Widget _buildStatItem(String label, String value, IconData icon) {
+    // kept for compatibility though not used in UI now
+    Color valueColor = Colors.green;
+    if (label == "Time" && value == "--") {
+      valueColor = Colors.orange;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.9),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 3,
+            offset: const Offset(1, 1),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: Colors.green.shade700, size: 20),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              color: Colors.grey.shade600,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: valueColor,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -262,67 +497,6 @@ class _PuzzleGameState extends State<PuzzleGame> {
                   ],
                 ),
         ),
-      ),
-    );
-  }
-
-  // helper used by right sidebar buttons
-  void _initializeForNewGame() {
-    setState(() {
-      gridSize = gridSize; // keep same grid size
-      _loadAndSliceImage();
-    });
-  }
-
-  void _resetProgress() {
-    setState(() {
-      gridSize = 3;
-      piecesPlaced = 0;
-      _loadAndSliceImage();
-    });
-  }
-
-  Widget _buildStatItem(String label, String value, IconData icon) {
-    // kept for compatibility though not used in UI now
-    Color valueColor = Colors.green;
-    if (label == "Time" && value == "--") {
-      valueColor = Colors.orange;
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.9),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            blurRadius: 3,
-            offset: const Offset(1, 1),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: Colors.green.shade700, size: 20),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10,
-              color: Colors.grey.shade600,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: valueColor,
-            ),
-          ),
-        ],
       ),
     );
   }

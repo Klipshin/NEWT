@@ -2,6 +2,151 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 
+// --- Supporting Classes from Reference (Themed Dialog) ---
+
+class ThemedGameDialog extends StatelessWidget {
+  final String title;
+  final Widget content;
+  final List<Widget> actions;
+  final Color titleColor;
+  final String mascotImagePath;
+
+  const ThemedGameDialog({
+    super.key,
+    required this.title,
+    required this.content,
+    required this.actions,
+    this.titleColor = Colors.white,
+    this.mascotImagePath = 'assets/images/eyeopenfrog.png',
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+
+    // Make the dialog very large, but responsive
+    final dialogWidth = screenWidth * 0.8;
+    final dialogHeight = screenHeight * 0.85;
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: dialogWidth,
+          maxHeight: dialogHeight,
+        ),
+        child: Stack(
+          alignment: Alignment.topCenter,
+          children: [
+            // 1. The Main Content Box (Wooden/Mossy Look)
+            Container(
+              margin: const EdgeInsets.only(
+                top: 50,
+              ), // Space for the title banner
+              decoration: BoxDecoration(
+                // Dark, swampy gradient for the body
+                gradient: LinearGradient(
+                  colors: [Colors.brown.shade800, Colors.green.shade900],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+                borderRadius: BorderRadius.circular(25),
+                border: Border.all(color: Colors.brown.shade600, width: 8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.6),
+                    blurRadius: 15,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(25, 75, 25, 25),
+                child: Column(
+                  mainAxisSize:
+                      MainAxisSize.max, // Ensures the column stretches
+                  children: [
+                    // Content Area: Wrapped in Expanded to take remaining vertical space
+                    Expanded(child: Center(child: content)),
+                    const SizedBox(height: 20),
+                    // Actions Row (buttons)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: actions,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // 2. The Title Header/Banner
+            Positioned(
+              top: 0,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 30,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade700,
+                  borderRadius: BorderRadius.circular(50),
+                  border: Border.all(color: Colors.yellow.shade700, width: 4),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.5),
+                      blurRadius: 8,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
+                    color: titleColor,
+                    shadows: const [
+                      Shadow(
+                        offset: Offset(2, 2),
+                        blurRadius: 2.0,
+                        color: Colors.black,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // 3. The Mascot Image (Placeholder image path used)
+            Positioned(
+              top: 35,
+              right: 15,
+              child: Image.asset(
+                mascotImagePath,
+                width: 70,
+                height: 70,
+                fit: BoxFit.contain,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class Animal {
+  final String name;
+  final String cardPath;
+
+  Animal({required this.name, required this.cardPath});
+}
+
+// --- GuessAnimalGame Implementation ---
+
 //animal quiz game - guess the animal name from the image
 class GuessAnimalGame extends StatefulWidget {
   const GuessAnimalGame({super.key});
@@ -44,6 +189,37 @@ class _GuessAnimalGameState extends State<GuessAnimalGame> {
   void initState() {
     super.initState();
     _initializeGame();
+  }
+
+  // --- Helper Widget for Themed Dialog Buttons ---
+  Widget _buildThemedButton(
+    BuildContext context, {
+    required String text,
+    required VoidCallback onPressed,
+    Color color = Colors.green,
+  }) {
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 5.0),
+        child: ElevatedButton(
+          onPressed: onPressed,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: color,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+              side: BorderSide(color: Colors.yellow.shade200, width: 3),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 15),
+            elevation: 8,
+          ),
+          child: Text(
+            text,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+          ),
+        ),
+      ),
+    );
   }
 
   void _initializeGame() {
@@ -117,59 +293,55 @@ class _GuessAnimalGameState extends State<GuessAnimalGame> {
       barrierDismissible: false,
       builder: (context) {
         bool isPerfect = score == totalQuestions;
-        return AlertDialog(
-          backgroundColor: isPerfect ? Colors.amber[50] : Colors.blue[50],
-          title: Text(
-            isPerfect ? '🎉 Perfect Score!' : '✅ Game Complete!',
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Your Score',
-                style: TextStyle(fontSize: 16, color: Colors.grey.shade700),
+        String title = isPerfect ? 'PERFECT! 🏆' : 'QUIZ COMPLETE! ✅';
+        Color titleColor = isPerfect
+            ? Colors.yellow.shade300
+            : Colors.cyan.shade300;
+
+        return ThemedGameDialog(
+          title: title,
+          titleColor: titleColor,
+          mascotImagePath: isPerfect
+              ? 'assets/images/mouthfrog.png'
+              : 'assets/images/eyeopenfrog.png',
+
+          // --- FIX: CONTENT IS NOW THE SCORE TEXT ---
+          content: Padding(
+            padding: const EdgeInsets.symmetric(
+              vertical: 40.0,
+            ), // Increased padding for height
+            child: Text(
+              '$score / $totalQuestions',
+              style: TextStyle(
+                fontSize: 56,
+                fontWeight: FontWeight.w900,
+                color: isPerfect
+                    ? Colors.amber.shade200
+                    : Colors.lightGreen.shade200,
               ),
-              const SizedBox(height: 8),
-              Text(
-                '$score / $totalQuestions',
-                style: TextStyle(
-                  fontSize: 48,
-                  fontWeight: FontWeight.bold,
-                  color: isPerfect
-                      ? Colors.amber.shade700
-                      : Colors.blue.shade700,
-                ),
-              ),
-              const SizedBox(height: 12),
-              if (isPerfect)
-                const Text(
-                  'Outstanding! You got them all right!',
-                  style: TextStyle(fontSize: 16),
-                  textAlign: TextAlign.center,
-                )
-              else
-                Text(
-                  'Great job! Keep practicing!',
-                  style: const TextStyle(fontSize: 16),
-                  textAlign: TextAlign.center,
-                ),
-            ],
+              textAlign: TextAlign.center,
+            ),
           ),
+
+          // --- END FIXED CONTENT ---
           actions: [
-            TextButton(
+            _buildThemedButton(
+              context,
+              text: 'Play Again',
               onPressed: () {
                 Navigator.of(context).pop();
                 _initializeGame();
               },
-              child: const Text('Play Again', style: TextStyle(fontSize: 16)),
+              color: Colors.green.shade700,
             ),
-            TextButton(
+            _buildThemedButton(
+              context,
+              text: 'Back to Menu',
               onPressed: () {
                 Navigator.of(context).pop();
                 Navigator.of(context).pop();
               },
-              child: const Text('Back to Menu', style: TextStyle(fontSize: 16)),
+              color: Colors.brown.shade700,
             ),
           ],
         );
@@ -444,11 +616,4 @@ class _GuessAnimalGameState extends State<GuessAnimalGame> {
       ),
     );
   }
-}
-
-class Animal {
-  final String name;
-  final String cardPath;
-
-  Animal({required this.name, required this.cardPath});
 }
