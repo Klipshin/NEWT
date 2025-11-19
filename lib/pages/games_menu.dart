@@ -8,7 +8,7 @@ import 'landing_page.dart';
 import "guess_animal.dart";
 import 'number_trace.dart';
 import 'color_game.dart';
-import 'puzzle_menu.dart';
+// import 'puzzle_menu.dart'; // Duplicate import removed
 
 class GamesMenu extends StatefulWidget {
   const GamesMenu({super.key});
@@ -18,8 +18,12 @@ class GamesMenu extends StatefulWidget {
 }
 
 class _GamesMenuState extends State<GamesMenu> {
-  final PageController _pageController = PageController(viewportFraction: 0.55);
+  late PageController _pageController;
   double currentPage = 0;
+
+  // 1. Define a large number for "infinite" feeling
+  final int _infinitePageCount = 100000;
+  late int _initialPage;
 
   final List<String> gameImages = const [
     'assets/images/fruits_basket.png',
@@ -35,6 +39,25 @@ class _GamesMenuState extends State<GamesMenu> {
   @override
   void initState() {
     super.initState();
+
+    // 2. Calculate the middle index
+    // We want a starting index that is in the middle of _infinitePageCount
+    // AND ensures that (index % length) == 0, so we start on the first image.
+    _initialPage = (_infinitePageCount / 2).round();
+    final int remainder = _initialPage % gameImages.length;
+    if (remainder != 0) {
+      _initialPage -= remainder;
+    }
+
+    // 3. Initialize controller starting at that middle index
+    _pageController = PageController(
+      viewportFraction: 0.55,
+      initialPage: _initialPage,
+    );
+
+    // Initialize currentPage to match the initialPage so scaling works immediately
+    currentPage = _initialPage.toDouble();
+
     _pageController.addListener(() {
       setState(() {
         currentPage = _pageController.page ?? 0;
@@ -108,14 +131,16 @@ class _GamesMenuState extends State<GamesMenu> {
             ),
           ),
 
-          // 🎠 Carousel (placed below)
+          // 🎠 Carousel
           Positioned.fill(
             child: Center(
               child: PageView.builder(
                 controller: _pageController,
-                itemCount: 10000,
+                itemCount: _infinitePageCount, // Uses the large number
                 itemBuilder: (context, index) {
+                  // 4. Use Modulo (%) to loop through the 8 images repeatedly
                   final realIndex = index % gameImages.length;
+
                   final double distance = (currentPage - index).abs();
                   final double scale = 1 - distance * 0.25;
                   final double opacity = 1 - distance * 0.4;
@@ -133,6 +158,14 @@ class _GamesMenuState extends State<GamesMenu> {
                           ),
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(20),
+                            // Optional: Add a shadow to make them pop more
+                            // boxShadow: [
+                            // BoxShadow(
+                            // color: Colors.black.withOpacity(0.2),
+                            //blurRadius: 10,
+                            //offset: const Offset(0, 5),
+                            // ),
+                            // ],
                           ),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(20),
@@ -150,7 +183,7 @@ class _GamesMenuState extends State<GamesMenu> {
             ),
           ),
 
-          // 🔙 Back button (always on top, clickable)
+          // 🔙 Back button
           Positioned(
             top: 40,
             left: 20,

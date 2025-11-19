@@ -1,153 +1,16 @@
 import 'dart:async';
-import 'dart:math';
+import 'dart:math' as math; // Alias math to avoid conflicts
 import 'package:flutter/material.dart';
+import 'package:audioplayers/audioplayers.dart';
+import 'package:confetti/confetti.dart';
 
-// --- Supporting Classes from Reference (Themed Dialog) ---
-
-class ThemedGameDialog extends StatelessWidget {
-  final String title;
-  final Widget content;
-  final List<Widget> actions;
-  final Color titleColor;
-  final String mascotImagePath;
-
-  const ThemedGameDialog({
-    super.key,
-    required this.title,
-    required this.content,
-    required this.actions,
-    this.titleColor = Colors.white,
-    this.mascotImagePath = 'assets/images/eyeopenfrog.png',
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
-
-    // Make the dialog very large, but responsive
-    final dialogWidth = screenWidth * 0.8;
-    final dialogHeight = screenHeight * 0.85;
-
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: dialogWidth,
-          maxHeight: dialogHeight,
-        ),
-        child: Stack(
-          alignment: Alignment.topCenter,
-          children: [
-            // 1. The Main Content Box (Wooden/Mossy Look)
-            Container(
-              margin: const EdgeInsets.only(
-                top: 50,
-              ), // Space for the title banner
-              decoration: BoxDecoration(
-                // Dark, swampy gradient for the body
-                gradient: LinearGradient(
-                  colors: [Colors.brown.shade800, Colors.green.shade900],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-                borderRadius: BorderRadius.circular(25),
-                border: Border.all(color: Colors.brown.shade600, width: 8),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.6),
-                    blurRadius: 15,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
-              ),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(25, 75, 25, 25),
-                child: Column(
-                  mainAxisSize:
-                      MainAxisSize.max, // Ensures the column stretches
-                  children: [
-                    // Content Area: Wrapped in Expanded to take remaining vertical space
-                    Expanded(child: Center(child: content)),
-                    const SizedBox(height: 20),
-                    // Actions Row (buttons)
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: actions,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // 2. The Title Header/Banner
-            Positioned(
-              top: 0,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 12,
-                  horizontal: 30,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.green.shade700,
-                  borderRadius: BorderRadius.circular(50),
-                  border: Border.all(color: Colors.yellow.shade700, width: 4),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.5),
-                      blurRadius: 8,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
-                ),
-                child: Text(
-                  title,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w900,
-                    color: titleColor,
-                    shadows: const [
-                      Shadow(
-                        offset: Offset(2, 2),
-                        blurRadius: 2.0,
-                        color: Colors.black,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            // 3. The Mascot Image (Placeholder image path used)
-            Positioned(
-              top: 35,
-              right: 15,
-              child: Image.asset(
-                mascotImagePath,
-                width: 70,
-                height: 70,
-                fit: BoxFit.contain,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
+// Simple data class for the quiz
 class Animal {
   final String name;
   final String cardPath;
-
   Animal({required this.name, required this.cardPath});
 }
 
-// --- GuessAnimalGame Implementation ---
-
-//animal quiz game - guess the animal name from the image
 class GuessAnimalGame extends StatefulWidget {
   const GuessAnimalGame({super.key});
 
@@ -175,51 +38,73 @@ class _GuessAnimalGameState extends State<GuessAnimalGame> {
   static const int choicesCount = 3;
   static const int totalQuestions = 10;
 
-  List<Animal> gameQuestions = []; // The 10 unique animals for this game
+  List<Animal> gameQuestions = [];
   int currentQuestionIndex = 0;
-
   Animal? currentAnimal;
   List<Animal> currentChoices = [];
-
   int score = 0;
   bool hasAnswered = false;
   String? selectedName;
 
+  // Audio and Effects
+  late AudioPlayer _bgMusicPlayer;
+  late ConfettiController _bgConfettiController; // Background celebrations
+  late ConfettiController _dialogConfettiController; // Popups celebrations
+
   @override
   void initState() {
     super.initState();
+
+    _bgConfettiController = ConfettiController(
+      duration: const Duration(seconds: 3),
+    );
+    _dialogConfettiController = ConfettiController(
+      duration: const Duration(seconds: 1),
+    );
+
+    _bgMusicPlayer = AudioPlayer();
+    _playBackgroundMusic();
+
     _initializeGame();
   }
 
-  // --- Helper Widget for Themed Dialog Buttons ---
-  Widget _buildThemedButton(
-    BuildContext context, {
-    required String text,
-    required VoidCallback onPressed,
-    Color color = Colors.green,
-  }) {
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 5.0),
-        child: ElevatedButton(
-          onPressed: onPressed,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: color,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15),
-              side: BorderSide(color: Colors.yellow.shade200, width: 3),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 15),
-            elevation: 8,
-          ),
-          child: Text(
-            text,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-          ),
-        ),
-      ),
-    );
+  @override
+  void dispose() {
+    _bgMusicPlayer.dispose();
+    _bgConfettiController.dispose();
+    _dialogConfettiController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _playBackgroundMusic() async {
+    await _bgMusicPlayer.setReleaseMode(ReleaseMode.loop);
+    await _bgMusicPlayer.play(AssetSource('sounds/card.mp3'));
+  }
+
+  Path drawStar(Size size) {
+    double cx = size.width / 2;
+    double cy = size.height / 2;
+    double outerRadius = size.width / 2;
+    double innerRadius = size.width / 5;
+
+    Path path = Path();
+    double rot = math.pi / 2 * 3;
+    double step = math.pi / 5;
+
+    path.moveTo(cx, cy - outerRadius);
+    for (int i = 0; i < 5; i++) {
+      double x = cx + math.cos(rot) * outerRadius;
+      double y = cy + math.sin(rot) * outerRadius;
+      path.lineTo(x, y);
+      rot += step;
+
+      x = cx + math.cos(rot) * innerRadius;
+      y = cy + math.sin(rot) * innerRadius;
+      path.lineTo(x, y);
+      rot += step;
+    }
+    path.close();
+    return path;
   }
 
   void _initializeGame() {
@@ -228,30 +113,24 @@ class _GuessAnimalGameState extends State<GuessAnimalGame> {
       currentQuestionIndex = 0;
       hasAnswered = false;
       selectedName = null;
+      _bgConfettiController.stop();
+      _dialogConfettiController.stop();
 
-      // Select 10 random unique animals for this game
       List<Animal> shuffled = List.from(allAnimals);
       shuffled.shuffle();
       gameQuestions = shuffled.take(totalQuestions).toList();
     });
-
     _loadQuestion();
   }
 
   void _loadQuestion() {
-    if (currentQuestionIndex >= totalQuestions) {
-      _showGameCompleteDialog();
-      return;
-    }
+    // NOTE: The Game Over check has been moved to _select
+    // to prevent the UI from rendering "11/10" briefly.
 
     setState(() {
       hasAnswered = false;
       selectedName = null;
-
-      // Current animal is from the pre-selected list
       currentAnimal = gameQuestions[currentQuestionIndex];
-
-      // Build choices: correct answer + 2 random wrong answers
       currentChoices = [currentAnimal!];
 
       List<Animal> others = allAnimals
@@ -259,7 +138,7 @@ class _GuessAnimalGameState extends State<GuessAnimalGame> {
           .toList();
       others.shuffle();
 
-      final toTake = min(choicesCount - 1, others.length);
+      final toTake = math.min(choicesCount - 1, others.length);
       currentChoices.addAll(others.take(toTake));
       currentChoices.shuffle();
     });
@@ -274,85 +153,197 @@ class _GuessAnimalGameState extends State<GuessAnimalGame> {
     });
 
     final correct = name == currentAnimal!.name;
-    if (correct) score++;
+    if (correct) {
+      score++;
+    }
 
-    // Move to next question after delay
     Timer(const Duration(milliseconds: 1200), () {
       if (mounted) {
-        setState(() {
-          currentQuestionIndex++;
-        });
-        _loadQuestion();
+        // --- FIXED LOGIC HERE ---
+        // Check if we just answered the last question (index 9 if total is 10)
+        if (currentQuestionIndex >= totalQuestions - 1) {
+          // Do NOT increment index. Just show results.
+          _showGameCompleteDialog();
+        } else {
+          // Move to next question
+          setState(() {
+            currentQuestionIndex++;
+          });
+          _loadQuestion();
+        }
       }
     });
   }
 
+  // --- SHARED DIALOG BUILDER ---
+  Widget _buildDialogContent(
+    String title,
+    String message,
+    List<Widget> actions,
+  ) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      child: Stack(
+        alignment: Alignment.topCenter,
+        children: [
+          Container(
+            width: 500,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.green.shade800, width: 4),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 15,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 20),
+                ),
+                const SizedBox(height: 30),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: actions,
+                ),
+              ],
+            ),
+          ),
+          // Confetti for the dialog itself
+          ConfettiWidget(
+            confettiController: _dialogConfettiController,
+            blastDirection: math.pi / 2, // Downwards
+            maxBlastForce: 20,
+            minBlastForce: 10,
+            emissionFrequency: 0.2,
+            numberOfParticles: 15,
+            gravity: 0.5,
+            shouldLoop: false,
+            colors: const [Colors.yellow, Colors.lightGreen, Colors.lightBlue],
+            createParticlePath: drawStar,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- POPUPS USING THE SHARED BUILDER ---
+
+  Future<void> _onBackButtonPressed() async {
+    bool? shouldExit = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _buildDialogContent(
+        '🚪 Leaving already?',
+        'Your current quiz progress will be lost!',
+        [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context, false);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text('Stay & Play', style: TextStyle(fontSize: 16)),
+          ),
+          const SizedBox(width: 20),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context, true);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text('Exit Quiz', style: TextStyle(fontSize: 16)),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldExit == true && mounted) {
+      Navigator.of(context).pop();
+    }
+  }
+
   void _showGameCompleteDialog() {
+    _bgConfettiController.play();
+    _dialogConfettiController.play();
+
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) {
+      builder: (_) {
         bool isPerfect = score == totalQuestions;
-        String title = isPerfect ? 'PERFECT! 🏆' : 'QUIZ COMPLETE! ✅';
-        Color titleColor = isPerfect
-            ? Colors.yellow.shade300
-            : Colors.cyan.shade300;
+        String title = isPerfect ? '🏆 Perfect Score!' : '🎉 Quiz Complete!';
+        String msg = isPerfect
+            ? 'Amazing! You got $score/$totalQuestions correct.'
+            : 'Great job! You scored $score/$totalQuestions.';
 
-        return ThemedGameDialog(
-          title: title,
-          titleColor: titleColor,
-          mascotImagePath: isPerfect
-              ? 'assets/images/mouthfrog.png'
-              : 'assets/images/eyeopenfrog.png',
-
-          // --- FIX: CONTENT IS NOW THE SCORE TEXT ---
-          content: Padding(
-            padding: const EdgeInsets.symmetric(
-              vertical: 40.0,
-            ), // Increased padding for height
-            child: Text(
-              '$score / $totalQuestions',
-              style: TextStyle(
-                fontSize: 56,
-                fontWeight: FontWeight.w900,
-                color: isPerfect
-                    ? Colors.amber.shade200
-                    : Colors.lightGreen.shade200,
+        return _buildDialogContent(title, msg, [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
-              textAlign: TextAlign.center,
             ),
+            child: const Text('Back to Menu', style: TextStyle(fontSize: 16)),
           ),
-
-          // --- END FIXED CONTENT ---
-          actions: [
-            _buildThemedButton(
-              context,
-              text: 'Play Again',
-              onPressed: () {
-                Navigator.of(context).pop();
-                _initializeGame();
-              },
-              color: Colors.green.shade700,
+          const SizedBox(width: 20),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _initializeGame();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
-            _buildThemedButton(
-              context,
-              text: 'Back to Menu',
-              onPressed: () {
-                Navigator.of(context).pop();
-                Navigator.of(context).pop();
-              },
-              color: Colors.brown.shade700,
-            ),
-          ],
-        );
+            child: const Text('Play Again', style: TextStyle(fontSize: 16)),
+          ),
+        ]);
       },
     );
   }
 
+  // --- WIDGET BUILDING ---
+
   Widget _choiceCard(Animal a) {
     final bool isSelected = selectedName == a.name;
     final bool isCorrect = a.name == currentAnimal?.name;
-
     Color? backgroundColor;
     Color? borderColor;
 
@@ -466,152 +457,286 @@ class _GuessAnimalGameState extends State<GuessAnimalGame> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage("assets/images/picnic_new.png"),
-            fit: BoxFit.cover,
-          ),
-        ),
-        child: Container(
-          color: const Color.fromARGB(255, 112, 155, 131).withOpacity(0.4),
-          child: SafeArea(
-            child: currentAnimal == null || currentChoices.length < choicesCount
-                ? const Center(child: CircularProgressIndicator())
-                : Row(
-                    children: [
-                      // Left: Animal card image
-                      Expanded(
-                        flex: 2,
-                        child: Container(
-                          padding: const EdgeInsets.all(20),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                'What animal is this?',
-                                style: TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                  shadows: [
-                                    Shadow(
-                                      color: Colors.black.withOpacity(0.8),
-                                      offset: const Offset(2, 2),
-                                      blurRadius: 4,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _onBackButtonPressed();
+      },
+      child: Scaffold(
+        body: Stack(
+          children: [
+            // Background & Game Content
+            Container(
+              decoration: const BoxDecoration(
+                image: DecorationImage(
+                  image: AssetImage("assets/images/picnic_new.png"),
+                  fit: BoxFit.cover,
+                ),
+              ),
+              child: Container(
+                color: const Color.fromARGB(
+                  255,
+                  112,
+                  155,
+                  131,
+                ).withOpacity(0.4),
+                child: SafeArea(
+                  child:
+                      currentAnimal == null ||
+                          currentChoices.length < choicesCount
+                      ? const Center(child: CircularProgressIndicator())
+                      : Row(
+                          children: [
+                            // Left: Animal card image
+                            Expanded(
+                              flex: 2,
+                              child: Container(
+                                padding: const EdgeInsets.all(20),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      'What animal is this?',
+                                      style: TextStyle(
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                        shadows: [
+                                          Shadow(
+                                            color: Colors.black.withOpacity(
+                                              0.8,
+                                            ),
+                                            offset: const Offset(2, 2),
+                                            blurRadius: 4,
+                                          ),
+                                        ],
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                    const SizedBox(height: 20),
+                                    Expanded(
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          borderRadius: BorderRadius.circular(
+                                            16,
+                                          ),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black.withOpacity(
+                                                0.2,
+                                              ),
+                                              blurRadius: 10,
+                                              offset: const Offset(0, 4),
+                                            ),
+                                          ],
+                                        ),
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(
+                                            16,
+                                          ),
+                                          child: Padding(
+                                            padding: const EdgeInsets.all(16.0),
+                                            child: Image.asset(
+                                              currentAnimal!.cardPath,
+                                              fit: BoxFit.contain,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
                                     ),
                                   ],
                                 ),
-                                textAlign: TextAlign.center,
                               ),
-                              const SizedBox(height: 20),
-                              Expanded(
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(16),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withOpacity(0.2),
-                                        blurRadius: 10,
-                                        offset: const Offset(0, 4),
-                                      ),
-                                    ],
-                                  ),
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(16),
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(16.0),
-                                      child: Image.asset(
-                                        currentAnimal!.cardPath,
-                                        fit: BoxFit.contain,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
+                            ),
 
-                      // Center: Text choices
-                      Expanded(
-                        flex: 2,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16.0,
-                            vertical: 20.0,
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Text(
-                                'Choose the correct answer:',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                  shadows: [
-                                    Shadow(
-                                      color: Colors.black.withOpacity(0.8),
-                                      offset: const Offset(2, 2),
-                                      blurRadius: 4,
+                            // Center: Text choices
+                            Expanded(
+                              flex: 2,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16.0,
+                                  vertical: 20.0,
+                                ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    Text(
+                                      'Choose the correct answer:',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                        shadows: [
+                                          Shadow(
+                                            color: Colors.black.withOpacity(
+                                              0.8,
+                                            ),
+                                            offset: const Offset(2, 2),
+                                            blurRadius: 4,
+                                          ),
+                                        ],
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                    const SizedBox(height: 20),
+                                    ...currentChoices.map(
+                                      (a) => _choiceCard(a),
                                     ),
                                   ],
                                 ),
-                                textAlign: TextAlign.center,
                               ),
-                              const SizedBox(height: 20),
-                              ...currentChoices
-                                  .map((a) => _choiceCard(a))
-                                  .toList(),
-                            ],
-                          ),
-                        ),
-                      ),
+                            ),
 
-                      // Right sidebar with stats
-                      Container(
-                        width: 90,
-                        padding: const EdgeInsets.all(8),
-                        child: SingleChildScrollView(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              _buildSideStatItem(
-                                'Score',
-                                '$score/$totalQuestions',
-                                Icons.star,
-                              ),
-                              const SizedBox(height: 20),
-                              _buildSideStatItem(
-                                'Question',
-                                '${currentQuestionIndex + 1}/$totalQuestions',
-                                Icons.quiz,
-                              ),
-                              const SizedBox(height: 20),
-                              Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.9),
-                                  borderRadius: BorderRadius.circular(15),
+                            // Right sidebar with stats
+                            Container(
+                              width: 90,
+                              padding: const EdgeInsets.all(8),
+                              child: SingleChildScrollView(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    _buildSideStatItem(
+                                      'Score',
+                                      '$score/$totalQuestions',
+                                      Icons.star,
+                                    ),
+                                    const SizedBox(height: 20),
+                                    _buildSideStatItem(
+                                      'Question',
+                                      // Display 1-based index
+                                      '${currentQuestionIndex + 1}/$totalQuestions',
+                                      Icons.quiz,
+                                    ),
+                                    const SizedBox(height: 20),
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.9),
+                                        borderRadius: BorderRadius.circular(15),
+                                      ),
+                                      child: IconButton(
+                                        onPressed: _initializeGame,
+                                        icon: const Icon(Icons.refresh),
+                                        color: Colors.green.shade700,
+                                        tooltip: 'Reset Game',
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.9),
+                                        borderRadius: BorderRadius.circular(15),
+                                      ),
+                                      child: IconButton(
+                                        onPressed: _onBackButtonPressed,
+                                        icon: const Icon(
+                                          Icons.exit_to_app_rounded,
+                                        ),
+                                        color: Colors.red.shade700,
+                                        tooltip: 'Exit Game',
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                child: IconButton(
-                                  onPressed: _initializeGame,
-                                  icon: const Icon(Icons.refresh),
-                                  color: Colors.green.shade700,
-                                  tooltip: 'Reset Game',
-                                ),
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
-                  ),
-          ),
+                ),
+              ),
+            ),
+
+            // --- CONFETTI OVERLAY (Background) ---
+            Align(
+              alignment: Alignment.topCenter,
+              child: ConfettiWidget(
+                confettiController: _bgConfettiController,
+                blastDirection: math.pi / 2,
+                maxBlastForce: 10,
+                minBlastForce: 5,
+                emissionFrequency: 0.08,
+                numberOfParticles: 30,
+                colors: const [
+                  Colors.green,
+                  Colors.blue,
+                  Colors.pink,
+                  Colors.orange,
+                ],
+                createParticlePath: drawStar,
+              ),
+            ),
+            Align(
+              alignment: Alignment.topLeft,
+              child: ConfettiWidget(
+                confettiController: _bgConfettiController,
+                blastDirection: math.pi / 3,
+                emissionFrequency: 0.1,
+                numberOfParticles: 25,
+                colors: const [Colors.green, Colors.blue, Colors.pink],
+                createParticlePath: drawStar,
+              ),
+            ),
+            Align(
+              alignment: Alignment.topRight,
+              child: ConfettiWidget(
+                confettiController: _bgConfettiController,
+                blastDirection: 2 * math.pi / 3,
+                emissionFrequency: 0.1,
+                numberOfParticles: 25,
+                colors: const [Colors.purple, Colors.amber, Colors.red],
+                createParticlePath: drawStar,
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: ConfettiWidget(
+                confettiController: _bgConfettiController,
+                blastDirection: 0,
+                maxBlastForce: 15,
+                emissionFrequency: 0.08,
+                numberOfParticles: 20,
+                colors: const [Colors.yellow, Colors.orange, Colors.red],
+                createParticlePath: drawStar,
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: ConfettiWidget(
+                confettiController: _bgConfettiController,
+                blastDirection: math.pi,
+                maxBlastForce: 15,
+                emissionFrequency: 0.08,
+                numberOfParticles: 20,
+                colors: const [Colors.blue, Colors.cyan, Colors.purple],
+                createParticlePath: drawStar,
+              ),
+            ),
+            Align(
+              alignment: Alignment.bottomLeft,
+              child: ConfettiWidget(
+                confettiController: _bgConfettiController,
+                blastDirection: -math.pi / 4,
+                emissionFrequency: 0.08,
+                numberOfParticles: 15,
+                colors: const [Colors.teal, Colors.lime, Colors.indigo],
+                createParticlePath: drawStar,
+              ),
+            ),
+            Align(
+              alignment: Alignment.bottomRight,
+              child: ConfettiWidget(
+                confettiController: _bgConfettiController,
+                blastDirection: -3 * math.pi / 4,
+                emissionFrequency: 0.08,
+                numberOfParticles: 15,
+                colors: const [Colors.pinkAccent, Colors.deepOrange],
+                createParticlePath: drawStar,
+              ),
+            ),
+          ],
         ),
       ),
     );

@@ -1,170 +1,10 @@
+import 'dart:async';
 import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-
-// --- Helper Widget for Themed Dialog Buttons ---
-Widget _buildThemedButton(
-  BuildContext context, {
-  required String text,
-  required VoidCallback onPressed,
-  Color color = Colors.green,
-}) {
-  return Expanded(
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 5.0),
-      child: ElevatedButton(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: color,
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15),
-            side: BorderSide(color: Colors.yellow.shade200, width: 3),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 15),
-          elevation: 8,
-        ),
-        child: Text(
-          text,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-        ),
-      ),
-    ),
-  );
-}
-
-// --- Themed Game Dialog Widget ---
-class ThemedGameDialog extends StatelessWidget {
-  final String title;
-  final Widget content;
-  final List<Widget> actions;
-  final Color titleColor;
-  final String mascotImagePath;
-
-  const ThemedGameDialog({
-    super.key,
-    required this.title,
-    required this.content,
-    required this.actions,
-    this.titleColor = Colors.white,
-    this.mascotImagePath = 'assets/images/eyeopenfrog.png',
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
-
-    final dialogWidth = screenWidth * 0.8;
-    final dialogHeight = screenHeight * 0.85;
-
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: dialogWidth,
-          maxHeight: dialogHeight,
-        ),
-        child: Stack(
-          alignment: Alignment.topCenter,
-          children: [
-            // 1. The Main Content Box (Wooden/Mossy Look)
-            Container(
-              margin: const EdgeInsets.only(
-                top: 50,
-              ), // Space for the title banner
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.brown.shade800, Colors.green.shade900],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-                borderRadius: BorderRadius.circular(25),
-                border: Border.all(color: Colors.brown.shade600, width: 8),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.6),
-                    blurRadius: 15,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
-              ),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(25, 75, 25, 25),
-                child: Column(
-                  mainAxisSize: MainAxisSize.max,
-                  children: [
-                    // Content Area
-                    Expanded(child: Center(child: content)),
-                    const SizedBox(height: 20),
-                    // Actions Row (buttons)
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: actions,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // 2. The Title Header/Banner
-            Positioned(
-              top: 0,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 12,
-                  horizontal: 30,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.green.shade700,
-                  borderRadius: BorderRadius.circular(50),
-                  border: Border.all(color: Colors.yellow.shade700, width: 4),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.5),
-                      blurRadius: 8,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
-                ),
-                child: Text(
-                  title,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w900,
-                    color: titleColor,
-                    shadows: const [
-                      Shadow(
-                        offset: Offset(2, 2),
-                        blurRadius: 2.0,
-                        color: Colors.black,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            // 3. The Mascot Image
-            Positioned(
-              top: 35,
-              right: 15,
-              child: Image.asset(
-                mascotImagePath,
-                width: 70,
-                height: 70,
-                fit: BoxFit.contain,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
+import 'package:audioplayers/audioplayers.dart'; // Added
+import 'package:confetti/confetti.dart'; // Added
 
 class PuzzleGame extends StatefulWidget {
   final String imagePath;
@@ -175,7 +15,7 @@ class PuzzleGame extends StatefulWidget {
   State<PuzzleGame> createState() => _PuzzleGameState();
 }
 
-class _PuzzleGameState extends State<PuzzleGame> {
+class _PuzzleGameState extends State<PuzzleGame> with TickerProviderStateMixin {
   ui.Image? _fullImage;
   List<PuzzlePiece> pieces = [];
   int gridSize = 3;
@@ -184,15 +24,77 @@ class _PuzzleGameState extends State<PuzzleGame> {
 
   final String backgroundImagePath = 'assets/images/picnic_new.png';
 
+  // --- NEW: Audio & Effects ---
+  late AudioPlayer _bgMusicPlayer;
+  late ConfettiController _bgConfettiController;
+  late ConfettiController _dialogConfettiController;
+
   @override
   void initState() {
     super.initState();
+
+    // Initialize Confetti
+    _bgConfettiController = ConfettiController(
+      duration: const Duration(seconds: 3),
+    );
+    _dialogConfettiController = ConfettiController(
+      duration: const Duration(seconds: 1),
+    );
+
+    // Initialize Audio
+    _bgMusicPlayer = AudioPlayer();
+    _playBackgroundMusic();
+
     _loadAndSliceImage();
+  }
+
+  @override
+  void dispose() {
+    _bgMusicPlayer.dispose();
+    _bgConfettiController.dispose();
+    _dialogConfettiController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _playBackgroundMusic() async {
+    await _bgMusicPlayer.setReleaseMode(ReleaseMode.loop);
+    // Using dots.mp3 as it's usually calmer for puzzles
+    await _bgMusicPlayer.play(AssetSource('sounds/dots.mp3'));
+  }
+
+  // --- STAR PATH FOR CONFETTI ---
+  Path drawStar(Size size) {
+    double cx = size.width / 2;
+    double cy = size.height / 2;
+    double outerRadius = size.width / 2;
+    double innerRadius = size.width / 5;
+
+    Path path = Path();
+    double rot = pi / 2 * 3;
+    double step = pi / 5;
+
+    path.moveTo(cx, cy - outerRadius);
+    for (int i = 0; i < 5; i++) {
+      double x = cx + cos(rot) * outerRadius;
+      double y = cy + sin(rot) * outerRadius;
+      path.lineTo(x, y);
+      rot += step;
+
+      x = cx + cos(rot) * innerRadius;
+      y = cy + sin(rot) * innerRadius;
+      path.lineTo(x, y);
+      rot += step;
+    }
+    path.close();
+    return path;
   }
 
   Future<void> _loadAndSliceImage() async {
     setState(() {
       isLoading = true;
+      // Stop confetti when resetting
+      _bgConfettiController.stop();
+      _dialogConfettiController.stop();
     });
 
     final ByteData data = await rootBundle.load(widget.imagePath);
@@ -257,252 +159,404 @@ class _PuzzleGameState extends State<PuzzleGame> {
     }
   }
 
-  // --- UPDATED DIALOG METHOD ---
+  // --- SHARED DIALOG BUILDER (Standard Style) ---
+  Widget _buildDialogContent(
+    String title,
+    String message,
+    List<Widget> actions,
+  ) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      child: Stack(
+        alignment: Alignment.topCenter,
+        children: [
+          Container(
+            width: 500,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.green.shade800, width: 4),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 15,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 20),
+                ),
+                const SizedBox(height: 30),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: actions,
+                ),
+              ],
+            ),
+          ),
+          ConfettiWidget(
+            confettiController: _dialogConfettiController,
+            blastDirection: pi / 2,
+            maxBlastForce: 20,
+            minBlastForce: 10,
+            emissionFrequency: 0.2,
+            numberOfParticles: 15,
+            gravity: 0.5,
+            shouldLoop: false,
+            colors: const [Colors.yellow, Colors.lightGreen, Colors.lightBlue],
+            createParticlePath: drawStar,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- UPDATED DIALOGS ---
+
   void _showCompletionDialog() {
+    _bgConfettiController.play();
+    _dialogConfettiController.play();
+
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) {
-        return ThemedGameDialog(
-          title: 'PUZZLE SOLVED! 🧩',
-          titleColor: Colors.yellow.shade300,
-          mascotImagePath: 'assets/images/mouthfrog.png',
-          content: const Padding(
-            padding: EdgeInsets.symmetric(vertical: 25.0),
-            child: Text(
-              'Fantastic! You completed the image.',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: Color.fromARGB(255, 230, 255, 230),
+      builder: (context) => _buildDialogContent(
+        '🧩 Puzzle Solved!',
+        'Fantastic! You completed the image.',
+        [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
-              textAlign: TextAlign.center,
             ),
+            child: const Text('Back to Menu', style: TextStyle(fontSize: 16)),
           ),
-          actions: [
-            _buildThemedButton(
-              context,
-              text: 'Play Again',
-              onPressed: () {
-                Navigator.of(context).pop();
-                _loadAndSliceImage();
-              },
-              color: Colors.green.shade700,
+          const SizedBox(width: 20),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _loadAndSliceImage();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
-            _buildThemedButton(
-              context,
-              text: 'Back to Menu',
-              onPressed: () {
-                Navigator.of(context).pop();
-                Navigator.of(context).pop();
-              },
-              color: Colors.brown.shade700,
-            ),
-          ],
-        );
-      },
+            child: const Text('Play Again', style: TextStyle(fontSize: 16)),
+          ),
+        ],
+      ),
     );
   }
-  // --- END UPDATED DIALOG METHOD ---
 
-  void _resetPuzzle() {
-    _loadAndSliceImage();
+  // --- NAVIGATION SAFETY ---
+  Future<void> _onBackButtonPressed() async {
+    bool? shouldExit = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _buildDialogContent(
+        '🚪 Leaving already?',
+        'Your current puzzle progress will be lost!',
+        [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context, false);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text('Stay & Play', style: TextStyle(fontSize: 16)),
+          ),
+          const SizedBox(width: 20),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context, true);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text('Exit Game', style: TextStyle(fontSize: 16)),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldExit == true && mounted) {
+      Navigator.of(context).pop();
+    }
   }
 
-  // helper used by right sidebar buttons
   void _initializeForNewGame() {
     setState(() {
-      gridSize = gridSize; // keep same grid size
       _loadAndSliceImage();
     });
-  }
-
-  void _resetProgress() {
-    setState(() {
-      gridSize = 3;
-      piecesPlaced = 0;
-      _loadAndSliceImage();
-    });
-  }
-
-  Widget _buildStatItem(String label, String value, IconData icon) {
-    // kept for compatibility though not used in UI now
-    Color valueColor = Colors.green;
-    if (label == "Time" && value == "--") {
-      valueColor = Colors.orange;
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.9),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            blurRadius: 3,
-            offset: const Offset(1, 1),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: Colors.green.shade700, size: 20),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10,
-              color: Colors.grey.shade600,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: valueColor,
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
-    // Use Scaffold and full background — cleaned top area per request.
-    return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage(backgroundImagePath),
-            fit: BoxFit.cover,
-          ),
-        ),
-        child: Container(
-          color: Colors.black.withOpacity(0.28),
-          child: isLoading
-              ? const Center(
-                  child: CircularProgressIndicator(color: Colors.white),
-                )
-              : Column(
-                  children: [
-                    // Small spacer instead of top bar (keeps top area clean)
-                    const SizedBox(height: 8),
-
-                    // Main content - moved slightly up by aligning to top
-                    Expanded(
-                      child: Row(
+    // Wrap with PopScope for navigation safety
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _onBackButtonPressed();
+      },
+      child: Scaffold(
+        body: Stack(
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                image: DecorationImage(
+                  image: AssetImage(backgroundImagePath),
+                  fit: BoxFit.cover,
+                ),
+              ),
+              child: Container(
+                color: Colors.black.withOpacity(0.28),
+                child: isLoading
+                    ? const Center(
+                        child: CircularProgressIndicator(color: Colors.white),
+                      )
+                    : Column(
                         children: [
-                          // Left: draggable pieces area
+                          const SizedBox(height: 8),
                           Expanded(
-                            flex: 1,
-                            child: Align(
-                              alignment: Alignment.centerRight,
-                              child: Padding(
-                                padding: const EdgeInsets.only(
-                                  left: 10.0,
-                                  right: 1.0,
-                                  top: 3.0,
-                                  bottom: 8.0,
-                                ),
-                                child: PuzzlePiecesArea(
-                                  image: _fullImage!,
-                                  pieces: pieces
-                                      .where((piece) => !piece.isPlaced)
-                                      .toList(),
-                                  gridSize: gridSize,
-                                ),
-                              ),
-                            ),
-                          ),
-
-                          // Middle: puzzle board (bigger) - aligned to top to move up
-                          Expanded(
-                            flex: 3,
-                            child: Align(
-                              alignment:
-                                  Alignment.topCenter, // push board slightly up
-                              child: Padding(
-                                padding: const EdgeInsets.only(top: 8.0),
-                                child: LayoutBuilder(
-                                  builder: (context, constraints) {
-                                    // Make the puzzle occupy as much space as possible but remain square.
-                                    final double maxSide = min(
-                                      constraints.maxWidth,
-                                      constraints.maxHeight,
-                                    );
-                                    // slightly bigger ratio so board sits a bit higher
-                                    final double boardSize = maxSide * 0.96;
-                                    return SizedBox(
-                                      width: boardSize,
-                                      height: boardSize,
-                                      child: PuzzleBoard(
-                                        image: _fullImage!,
-                                        pieces: pieces,
-                                        gridSize: gridSize,
-                                        onPiecePlaced: _checkPiecePlacement,
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                            ),
-                          ),
-
-                          // Right sidebar: only keep retry and back (cleaned)
-                          Container(
-                            width: 90,
-                            padding: const EdgeInsets.all(8),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
+                            child: Row(
                               children: [
-                                Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.9),
-                                    borderRadius: BorderRadius.circular(15),
-                                  ),
-                                  child: IconButton(
-                                    onPressed: _initializeForNewGame,
-                                    icon: const Icon(Icons.refresh),
-                                    color: Colors.green.shade700,
-                                    tooltip: 'New Puzzle',
+                                // Left: draggable pieces area
+                                Expanded(
+                                  flex: 1,
+                                  child: Align(
+                                    alignment: Alignment.centerRight,
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(
+                                        left: 10.0,
+                                        right: 1.0,
+                                        top: 3.0,
+                                        bottom: 8.0,
+                                      ),
+                                      child: PuzzlePiecesArea(
+                                        image: _fullImage!,
+                                        pieces: pieces
+                                            .where((piece) => !piece.isPlaced)
+                                            .toList(),
+                                        gridSize: gridSize,
+                                      ),
+                                    ),
                                   ),
                                 ),
-                                const SizedBox(height: 12),
-                                Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.9),
-                                    borderRadius: BorderRadius.circular(15),
+
+                                // Middle: puzzle board
+                                Expanded(
+                                  flex: 3,
+                                  child: Align(
+                                    alignment: Alignment.topCenter,
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(top: 8.0),
+                                      child: LayoutBuilder(
+                                        builder: (context, constraints) {
+                                          final double maxSide = min(
+                                            constraints.maxWidth,
+                                            constraints.maxHeight,
+                                          );
+                                          final double boardSize =
+                                              maxSide * 0.96;
+                                          return SizedBox(
+                                            width: boardSize,
+                                            height: boardSize,
+                                            child: PuzzleBoard(
+                                              image: _fullImage!,
+                                              pieces: pieces,
+                                              gridSize: gridSize,
+                                              onPiecePlaced:
+                                                  _checkPiecePlacement,
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
                                   ),
-                                  child: IconButton(
-                                    onPressed: () {
-                                      Navigator.of(context).pop();
-                                    },
-                                    icon: const Icon(Icons.arrow_back),
-                                    color: Colors.orange.shade700,
-                                    tooltip: 'Back',
+                                ),
+
+                                // Right sidebar
+                                Container(
+                                  width: 90,
+                                  padding: const EdgeInsets.all(8),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Container(
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.9),
+                                          borderRadius: BorderRadius.circular(
+                                            15,
+                                          ),
+                                        ),
+                                        child: IconButton(
+                                          onPressed: _initializeForNewGame,
+                                          icon: const Icon(Icons.refresh),
+                                          color: Colors.green.shade700,
+                                          tooltip: 'New Puzzle',
+                                        ),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Container(
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.9),
+                                          borderRadius: BorderRadius.circular(
+                                            15,
+                                          ),
+                                        ),
+                                        child: IconButton(
+                                          onPressed: _onBackButtonPressed,
+                                          icon: const Icon(
+                                            Icons.exit_to_app_rounded,
+                                          ),
+                                          color: Colors.red.shade700,
+                                          tooltip: 'Exit Game',
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ],
                             ),
                           ),
+                          const SizedBox(height: 8),
                         ],
                       ),
-                    ),
-                    // small bottom spacer
-                    const SizedBox(height: 8),
-                  ],
-                ),
+              ),
+            ),
+
+            // --- CONFETTI OVERLAYS ---
+            Align(
+              alignment: Alignment.topCenter,
+              child: ConfettiWidget(
+                confettiController: _bgConfettiController,
+                blastDirection: pi / 2,
+                maxBlastForce: 10,
+                minBlastForce: 5,
+                emissionFrequency: 0.08,
+                numberOfParticles: 30,
+                colors: const [
+                  Colors.green,
+                  Colors.blue,
+                  Colors.pink,
+                  Colors.orange,
+                ],
+                createParticlePath: drawStar,
+              ),
+            ),
+            Align(
+              alignment: Alignment.topLeft,
+              child: ConfettiWidget(
+                confettiController: _bgConfettiController,
+                blastDirection: pi / 3,
+                emissionFrequency: 0.1,
+                numberOfParticles: 25,
+                colors: const [Colors.green, Colors.blue, Colors.pink],
+                createParticlePath: drawStar,
+              ),
+            ),
+            Align(
+              alignment: Alignment.topRight,
+              child: ConfettiWidget(
+                confettiController: _bgConfettiController,
+                blastDirection: 2 * pi / 3,
+                emissionFrequency: 0.1,
+                numberOfParticles: 25,
+                colors: const [Colors.purple, Colors.amber, Colors.red],
+                createParticlePath: drawStar,
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: ConfettiWidget(
+                confettiController: _bgConfettiController,
+                blastDirection: 0,
+                maxBlastForce: 15,
+                emissionFrequency: 0.08,
+                numberOfParticles: 20,
+                colors: const [Colors.yellow, Colors.orange, Colors.red],
+                createParticlePath: drawStar,
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: ConfettiWidget(
+                confettiController: _bgConfettiController,
+                blastDirection: pi,
+                maxBlastForce: 15,
+                emissionFrequency: 0.08,
+                numberOfParticles: 20,
+                colors: const [Colors.blue, Colors.cyan, Colors.purple],
+                createParticlePath: drawStar,
+              ),
+            ),
+            Align(
+              alignment: Alignment.bottomLeft,
+              child: ConfettiWidget(
+                confettiController: _bgConfettiController,
+                blastDirection: -pi / 4,
+                emissionFrequency: 0.08,
+                numberOfParticles: 15,
+                colors: const [Colors.teal, Colors.lime, Colors.indigo],
+                createParticlePath: drawStar,
+              ),
+            ),
+            Align(
+              alignment: Alignment.bottomRight,
+              child: ConfettiWidget(
+                confettiController: _bgConfettiController,
+                blastDirection: -3 * pi / 4,
+                emissionFrequency: 0.08,
+                numberOfParticles: 15,
+                colors: const [Colors.pinkAccent, Colors.deepOrange],
+                createParticlePath: drawStar,
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-// PuzzlePiecesArea (unchanged except sizing tweaks)
+// --- UNCHANGED PUZZLE LOGIC CLASSES ---
+
 class PuzzlePiecesArea extends StatelessWidget {
   final ui.Image image;
   final List<PuzzlePiece> pieces;
@@ -602,7 +656,6 @@ class PuzzlePiecesArea extends StatelessWidget {
   }
 }
 
-// Updated PuzzleBoard — fixed alignment & ghost image
 class PuzzleBoard extends StatelessWidget {
   final ui.Image image;
   final List<PuzzlePiece> pieces;
@@ -619,7 +672,6 @@ class PuzzleBoard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Outer container already forces width/height via parent SizedBox.
     return LayoutBuilder(
       builder: (context, constraints) {
         final double boardSize = min(
@@ -639,18 +691,15 @@ class PuzzleBoard extends StatelessWidget {
             ),
             child: Stack(
               children: [
-                // Ghost image painted exactly into the square board area
                 Positioned.fill(
                   child: Opacity(
-                    opacity: 0.25, // adjust for stronger/softer guide
+                    opacity: 0.25,
                     child: CustomPaint(
                       painter: ImagePainter(image: image),
                       size: Size(boardSize, boardSize),
                     ),
                   ),
                 ),
-
-                // Grid with ZERO spacing/padding so tiles align perfectly with ghost
                 Positioned.fill(
                   child: GridView.builder(
                     padding: EdgeInsets.zero,
@@ -659,7 +708,7 @@ class PuzzleBoard extends StatelessWidget {
                       crossAxisCount: gridSize,
                       crossAxisSpacing: 0,
                       mainAxisSpacing: 0,
-                      childAspectRatio: 1.0, // force square cells
+                      childAspectRatio: 1.0,
                     ),
                     itemCount: gridSize * gridSize,
                     itemBuilder: (context, index) {
@@ -720,7 +769,6 @@ class PuzzleBoard extends StatelessWidget {
   }
 }
 
-// Data classes & painters
 class PuzzlePiece {
   final int id;
   final int correctRow;
@@ -776,7 +824,6 @@ class ImagePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Draw the whole image stretched to the square board area.
     final dest = Rect.fromLTWH(0, 0, size.width, size.height);
     final src = Rect.fromLTWH(
       0,

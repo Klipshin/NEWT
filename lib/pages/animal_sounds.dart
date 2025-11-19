@@ -2,8 +2,8 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:confetti/confetti.dart'; // Added Confetti
 
-//animal_sounds game
 class AnimalSoundsQuiz extends StatefulWidget {
   const AnimalSoundsQuiz({super.key});
 
@@ -15,6 +15,10 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
     with TickerProviderStateMixin {
   late AudioPlayer _soundPlayer;
   late AudioPlayer _bgMusicPlayer;
+
+  // --- NEW: Confetti Controllers ---
+  late ConfettiController _bgConfettiController;
+  late ConfettiController _dialogConfettiController;
 
   int currentScore = 0;
   int questionsAnswered = 0;
@@ -101,12 +105,20 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
   Animal? previousAnimal;
   List<Animal> currentChoices = [];
 
-  // Number of choices to display (now 3)
   static const int choicesCount = 3;
 
   @override
   void initState() {
     super.initState();
+
+    // Initialize Confetti
+    _bgConfettiController = ConfettiController(
+      duration: const Duration(seconds: 3),
+    );
+    _dialogConfettiController = ConfettiController(
+      duration: const Duration(seconds: 1),
+    );
+
     _soundPlayer = AudioPlayer();
     _bgMusicPlayer = AudioPlayer();
 
@@ -130,6 +142,8 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
     _gameTimer?.cancel();
     _correctController.dispose();
     _wrongController.dispose();
+    _bgConfettiController.dispose();
+    _dialogConfettiController.dispose();
     super.dispose();
   }
 
@@ -138,12 +152,42 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
     await _bgMusicPlayer.play(AssetSource('sounds/card.mp3'));
   }
 
+  // --- STAR PATH FOR CONFETTI ---
+  Path drawStar(Size size) {
+    double cx = size.width / 2;
+    double cy = size.height / 2;
+    double outerRadius = size.width / 2;
+    double innerRadius = size.width / 5;
+
+    Path path = Path();
+    double rot = pi / 2 * 3;
+    double step = pi / 5;
+
+    path.moveTo(cx, cy - outerRadius);
+    for (int i = 0; i < 5; i++) {
+      double x = cx + cos(rot) * outerRadius;
+      double y = cy + sin(rot) * outerRadius;
+      path.lineTo(x, y);
+      rot += step;
+
+      x = cx + cos(rot) * innerRadius;
+      y = cy + sin(rot) * innerRadius;
+      path.lineTo(x, y);
+      rot += step;
+    }
+    path.close();
+    return path;
+  }
+
   void _initializeGame() {
     currentScore = 0;
     questionsAnswered = 0;
     timeRemaining = 60;
     hasAnswered = false;
     selectedAnswer = null;
+
+    _bgConfettiController.stop();
+    _dialogConfettiController.stop();
 
     _gameTimer?.cancel();
     _startGameTimer();
@@ -181,7 +225,6 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
           .where((a) => a.name != previousAnimal?.name)
           .toList();
 
-      // If availableAnimals is too small (unlikely), fall back to allAnimals
       if (availableAnimals.isEmpty) {
         availableAnimals = List.from(allAnimals);
       }
@@ -189,7 +232,6 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
       currentAnimal = availableAnimals[random.nextInt(availableAnimals.length)];
       previousAnimal = currentAnimal;
 
-      // Build choicesCount choices: the correct animal + (choicesCount - 1) random others
       currentChoices = [currentAnimal!];
       List<Animal> otherAnimals = allAnimals
           .where((a) => a.name != currentAnimal!.name)
@@ -253,62 +295,118 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
     });
   }
 
+  // --- SHARED DIALOG BUILDER (Standard Style) ---
+  Widget _buildDialogContent(
+    String title,
+    String message,
+    List<Widget> actions,
+  ) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      child: Stack(
+        alignment: Alignment.topCenter,
+        children: [
+          Container(
+            width: 500,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.green.shade800, width: 4),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 15,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 20),
+                ),
+                const SizedBox(height: 30),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: actions,
+                ),
+              ],
+            ),
+          ),
+          ConfettiWidget(
+            confettiController: _dialogConfettiController,
+            blastDirection: pi / 2,
+            maxBlastForce: 20,
+            minBlastForce: 10,
+            emissionFrequency: 0.2,
+            numberOfParticles: 15,
+            gravity: 0.5,
+            shouldLoop: false,
+            colors: const [Colors.yellow, Colors.lightGreen, Colors.lightBlue],
+            createParticlePath: drawStar,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- DIALOG LOGIC ---
+
   void _showVictoryDialog() {
+    _bgConfettiController.play();
+    _dialogConfettiController.play();
+
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: Colors.amber[50],
-          title: const Text(
-            '🎉 Congratulations!',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'You completed all questions!',
-                style: TextStyle(fontSize: 18),
-                textAlign: TextAlign.center,
+      builder: (context) => _buildDialogContent(
+        '🎉 Congratulations!',
+        'You finished! Score: $currentScore',
+        [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
-              const SizedBox(height: 10),
-              Text(
-                'Final Score: $currentScore',
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.green,
-                ),
-              ),
-              Text(
-                'Time Left: $timeRemaining seconds',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.blue,
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _initializeGame();
-              },
-              child: const Text('Play Again'),
             ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                Navigator.of(context).pop();
-              },
-              child: const Text('Back to Menu'),
+            child: const Text('Back to Menu', style: TextStyle(fontSize: 16)),
+          ),
+          const SizedBox(width: 20),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _initializeGame();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
-          ],
-        );
-      },
+            child: const Text('Play Again', style: TextStyle(fontSize: 16)),
+          ),
+        ],
+      ),
     );
   }
 
@@ -316,115 +414,228 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: Colors.red[50],
-          title: const Text(
-            '⏰ Time\'s Up!',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('Game Over!', style: TextStyle(fontSize: 18)),
-              const SizedBox(height: 10),
-              Text(
-                'Score: $currentScore',
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.orange,
-                ),
+      builder: (context) => _buildDialogContent(
+        '⏰ Time\'s Up!',
+        'Score: $currentScore. Try again!',
+        [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
-              Text(
-                'Questions: $questionsAnswered/$totalQuestions',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
+            ),
+            child: const Text('Back to Menu', style: TextStyle(fontSize: 16)),
           ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _initializeGame();
-              },
-              child: const Text('Play Again'),
+          const SizedBox(width: 20),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _initializeGame();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                Navigator.of(context).pop();
-              },
-              child: const Text('Back to Menu'),
-            ),
-          ],
-        );
-      },
+            child: const Text('Play Again', style: TextStyle(fontSize: 16)),
+          ),
+        ],
+      ),
     );
+  }
+
+  // --- NAVIGATION SAFETY ---
+  Future<void> _onBackButtonPressed() async {
+    _gameTimer?.cancel(); // Pause timer
+
+    bool? shouldExit = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _buildDialogContent(
+        '🚪 Leaving already?',
+        'Your progress will be lost!',
+        [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context, false);
+              _startGameTimer(); // Resume timer
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text('Stay & Play', style: TextStyle(fontSize: 16)),
+          ),
+          const SizedBox(width: 20),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context, true);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text('Exit Game', style: TextStyle(fontSize: 16)),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldExit == true && mounted) {
+      Navigator.of(context).pop();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage("assets/images/picnic_new.png"),
-            fit: BoxFit.cover,
-          ),
-        ),
-        child: Container(
-          color: const Color.fromARGB(255, 112, 155, 131).withOpacity(0.3),
-          child: Column(
-            children: [
-              // Top bar with play button and question
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 12,
-                  horizontal: 16,
+    // Wrap with PopScope for safety
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _onBackButtonPressed();
+      },
+      child: Scaffold(
+        body: Stack(
+          children: [
+            // Layer 1: Background Image and Game Content
+            Container(
+              decoration: const BoxDecoration(
+                image: DecorationImage(
+                  image: AssetImage("assets/images/picnic_new.png"),
+                  fit: BoxFit.cover,
                 ),
+              ),
+              child: Container(
+                color: const Color.fromARGB(
+                  255,
+                  112,
+                  155,
+                  131,
+                ).withOpacity(0.3),
                 child: Column(
                   children: [
-                    // Sound player button
-                    GestureDetector(
-                      onTap: _playCurrentSound,
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: isPlaying ? Colors.orange : Colors.green,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.3),
-                              blurRadius: 8,
-                              offset: const Offset(0, 4),
+                    // Top bar with play button and question
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 12,
+                        horizontal: 16,
+                      ),
+                      child: Column(
+                        children: [
+                          // Sound player button
+                          GestureDetector(
+                            onTap: _playCurrentSound,
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: isPlaying ? Colors.orange : Colors.green,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.3),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: Icon(
+                                isPlaying ? Icons.volume_up : Icons.play_arrow,
+                                size: 40,
+                                color: Colors.white,
+                              ),
                             ),
-                          ],
-                        ),
-                        child: Icon(
-                          isPlaying ? Icons.volume_up : Icons.play_arrow,
-                          size: 40,
-                          color: Colors.white,
-                        ),
+                          ),
+                          const SizedBox(height: 12),
+                          // Question text
+                          Text(
+                            'Which animal makes this sound?',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              shadows: [
+                                Shadow(
+                                  color: Colors.black.withOpacity(0.8),
+                                  offset: const Offset(2, 2),
+                                  blurRadius: 4,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    // Question text
-                    Text(
-                      'Which animal makes this sound?',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        shadows: [
-                          Shadow(
-                            color: Colors.black.withOpacity(0.8),
-                            offset: const Offset(2, 2),
-                            blurRadius: 4,
+
+                    // Animal choices row
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12.0,
+                          vertical: 16.0,
+                        ),
+                        child: currentChoices.length < choicesCount
+                            ? const Center(child: CircularProgressIndicator())
+                            : Row(
+                                children: List.generate(
+                                  choicesCount,
+                                  (index) => Expanded(
+                                    child: Padding(
+                                      padding: EdgeInsets.only(
+                                        left: index == 0 ? 0 : 8,
+                                        right: index == choicesCount - 1
+                                            ? 0
+                                            : 8,
+                                      ),
+                                      child: _buildAnimalChoice(
+                                        currentChoices[index],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                      ),
+                    ),
+
+                    // Bottom stats bar
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 8,
+                        horizontal: 16,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.4),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          _buildStatItem(Icons.timer, '$timeRemaining s'),
+                          _buildStatItem(Icons.star, '$currentScore'),
+                          _buildStatItem(
+                            Icons.quiz,
+                            '${questionsAnswered + 1}/$totalQuestions',
+                          ),
+                          // Explicit Exit Button
+                          IconButton(
+                            onPressed: _onBackButtonPressed,
+                            icon: const Icon(Icons.exit_to_app_rounded),
+                            color: Colors.red.shade300,
+                            tooltip: 'Exit Game',
                           ),
                         ],
                       ),
@@ -432,62 +643,96 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
                   ],
                 ),
               ),
+            ),
 
-              // Animal choices row - 3 cards in one row (no scroll)
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12.0,
-                    vertical: 16.0,
-                  ),
-                  child: currentChoices.length < choicesCount
-                      ? const Center(child: CircularProgressIndicator())
-                      : Row(
-                          children: List.generate(
-                            choicesCount,
-                            (index) => Expanded(
-                              child: Padding(
-                                padding: EdgeInsets.only(
-                                  left: index == 0 ? 0 : 8,
-                                  right: index == choicesCount - 1 ? 0 : 8,
-                                ),
-                                child: _buildAnimalChoice(
-                                  currentChoices[index],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                ),
+            // Layer 2: Background Confetti System
+            Align(
+              alignment: Alignment.topCenter,
+              child: ConfettiWidget(
+                confettiController: _bgConfettiController,
+                blastDirection: pi / 2,
+                maxBlastForce: 10,
+                minBlastForce: 5,
+                emissionFrequency: 0.08,
+                numberOfParticles: 30,
+                colors: const [
+                  Colors.green,
+                  Colors.blue,
+                  Colors.pink,
+                  Colors.orange,
+                ],
+                createParticlePath: drawStar,
               ),
-
-              // Bottom stats bar
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 8,
-                  horizontal: 16,
-                ),
-                decoration: BoxDecoration(color: Colors.black.withOpacity(0.4)),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildStatItem(Icons.timer, '$timeRemaining s'),
-                    _buildStatItem(Icons.star, '$currentScore'),
-                    _buildStatItem(
-                      Icons.quiz,
-                      '${questionsAnswered + 1}/$totalQuestions',
-                    ),
-                    IconButton(
-                      onPressed: _initializeGame,
-                      icon: const Icon(Icons.refresh),
-                      color: Colors.white,
-                      tooltip: 'Reset Game',
-                    ),
-                  ],
-                ),
+            ),
+            Align(
+              alignment: Alignment.topLeft,
+              child: ConfettiWidget(
+                confettiController: _bgConfettiController,
+                blastDirection: pi / 3,
+                emissionFrequency: 0.1,
+                numberOfParticles: 25,
+                colors: const [Colors.green, Colors.blue, Colors.pink],
+                createParticlePath: drawStar,
               ),
-            ],
-          ),
+            ),
+            Align(
+              alignment: Alignment.topRight,
+              child: ConfettiWidget(
+                confettiController: _bgConfettiController,
+                blastDirection: 2 * pi / 3,
+                emissionFrequency: 0.1,
+                numberOfParticles: 25,
+                colors: const [Colors.purple, Colors.amber, Colors.red],
+                createParticlePath: drawStar,
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: ConfettiWidget(
+                confettiController: _bgConfettiController,
+                blastDirection: 0,
+                maxBlastForce: 15,
+                emissionFrequency: 0.08,
+                numberOfParticles: 20,
+                colors: const [Colors.yellow, Colors.orange, Colors.red],
+                createParticlePath: drawStar,
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: ConfettiWidget(
+                confettiController: _bgConfettiController,
+                blastDirection: pi,
+                maxBlastForce: 15,
+                emissionFrequency: 0.08,
+                numberOfParticles: 20,
+                colors: const [Colors.blue, Colors.cyan, Colors.purple],
+                createParticlePath: drawStar,
+              ),
+            ),
+            Align(
+              alignment: Alignment.bottomLeft,
+              child: ConfettiWidget(
+                confettiController: _bgConfettiController,
+                blastDirection: -pi / 4,
+                emissionFrequency: 0.08,
+                numberOfParticles: 15,
+                colors: const [Colors.teal, Colors.lime, Colors.indigo],
+                createParticlePath: drawStar,
+              ),
+            ),
+            Align(
+              alignment: Alignment.bottomRight,
+              child: ConfettiWidget(
+                confettiController: _bgConfettiController,
+                blastDirection: -3 * pi / 4,
+                emissionFrequency: 0.08,
+                numberOfParticles: 15,
+                colors: const [Colors.pinkAccent, Colors.deepOrange],
+                createParticlePath: drawStar,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -503,32 +748,6 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
           value,
           style: const TextStyle(
             fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-      ],
-    );
-  }
-
-  // Small wrapper in case other code expects `_buildStatText`
-  Widget _buildStatText(String label, String value) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            color: Colors.grey.shade300,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(width: 6),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 15,
             fontWeight: FontWeight.bold,
             color: Colors.white,
           ),
@@ -569,7 +788,6 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
           child: Stack(
             fit: StackFit.expand,
             children: [
-              // BoxFit.contain ensures the whole image is visible
               Image.asset(animal.cardPath, fit: BoxFit.contain),
               if (overlayColor != null)
                 Container(

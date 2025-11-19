@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:video_player/video_player.dart';
+import 'package:confetti/confetti.dart'; // Import Confetti
 
 class NumberPathGame extends StatefulWidget {
   const NumberPathGame({super.key});
@@ -28,7 +29,10 @@ class _NumberPathGameState extends State<NumberPathGame>
 
   late AnimationController _winController;
   late AudioPlayer _bgMusicPlayer;
-  bool _isMuted = false;
+
+  // --- NEW: Confetti Controllers ---
+  late ConfettiController _bgConfettiController;
+  late ConfettiController _dialogConfettiController;
 
   // Number range for each level
   int maxNumber = 5;
@@ -41,6 +45,15 @@ class _NumberPathGameState extends State<NumberPathGame>
   @override
   void initState() {
     super.initState();
+
+    // Initialize Confetti
+    _bgConfettiController = ConfettiController(
+      duration: const Duration(seconds: 3),
+    );
+    _dialogConfettiController = ConfettiController(
+      duration: const Duration(seconds: 1),
+    );
+
     _initializeGame();
     _startMascotAnimation();
     _bgMusicPlayer = AudioPlayer();
@@ -57,6 +70,8 @@ class _NumberPathGameState extends State<NumberPathGame>
     _gameTimer?.cancel();
     _winController.dispose();
     _bgMusicPlayer.dispose();
+    _bgConfettiController.dispose();
+    _dialogConfettiController.dispose();
     super.dispose();
   }
 
@@ -68,6 +83,33 @@ class _NumberPathGameState extends State<NumberPathGame>
         });
       }
     });
+  }
+
+  // --- STAR SHAPE FOR CONFETTI ---
+  Path drawStar(Size size) {
+    double cx = size.width / 2;
+    double cy = size.height / 2;
+    double outerRadius = size.width / 2;
+    double innerRadius = size.width / 5;
+
+    Path path = Path();
+    double rot = pi / 2 * 3;
+    double step = pi / 5;
+
+    path.moveTo(cx, cy - outerRadius);
+    for (int i = 0; i < 5; i++) {
+      double x = cx + cos(rot) * outerRadius;
+      double y = cy + sin(rot) * outerRadius;
+      path.lineTo(x, y);
+      rot += step;
+
+      x = cx + cos(rot) * innerRadius;
+      y = cy + sin(rot) * innerRadius;
+      path.lineTo(x, y);
+      rot += step;
+    }
+    path.close();
+    return path;
   }
 
   void _updateDifficultyForLevel() {
@@ -112,6 +154,8 @@ class _NumberPathGameState extends State<NumberPathGame>
   void _initializeGame() {
     gameComplete = false;
     currentPath.clear();
+    _bgConfettiController.stop();
+    _dialogConfettiController.stop();
     _updateDifficultyForLevel();
     _generatePuzzle();
     _startTimer();
@@ -147,57 +191,6 @@ class _NumberPathGameState extends State<NumberPathGame>
     _isTimerRunning = false;
   }
 
-  void _onTimeUp() {
-    _stopTimer();
-    gameComplete = true;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) {
-        return ThemedGameDialog(
-          title: 'TIME\'S UP! ⏰',
-          titleColor: Colors.orange.shade300,
-          mascotImagePath: 'assets/images/closefrog.png',
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Try again!',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.orange.shade50,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-          actions: [
-            _buildThemedButton(
-              context,
-              text: 'Try Again',
-              onPressed: () {
-                Navigator.pop(context);
-                _initializeGame();
-              },
-              color: Colors.green.shade700,
-            ),
-            _buildThemedButton(
-              context,
-              text: 'Back to Menu',
-              onPressed: () {
-                Navigator.pop(context);
-                Navigator.pop(context);
-              },
-              color: Colors.brown.shade700,
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   Future<void> _playBackgroundMusic() async {
     await _bgMusicPlayer.setReleaseMode(ReleaseMode.loop);
     await _bgMusicPlayer.play(AssetSource('sounds/dots.mp3'));
@@ -205,8 +198,6 @@ class _NumberPathGameState extends State<NumberPathGame>
 
   void _generatePuzzle() {
     final rand = Random();
-
-    // Simplified puzzle generation - much faster!
     grid = List.generate(gridSize, (_) => List.filled(gridSize, null));
 
     // Place START at random position
@@ -214,23 +205,17 @@ class _NumberPathGameState extends State<NumberPathGame>
     int startY = rand.nextInt(gridSize);
     startPos = Offset(startX.toDouble(), startY.toDouble());
 
-    // Place END at a different position (guaranteed to be different from START)
+    // Place END at a different position
     int endX, endY;
     do {
       endX = rand.nextInt(gridSize);
       endY = rand.nextInt(gridSize);
-    } while (endX == startX &&
-        endY == startY); // Ensure END is different from START
+    } while (endX == startX && endY == startY);
 
     endPos = Offset(endX.toDouble(), endY.toDouble());
 
-    print('START position: $startPos');
-    print('END position: $endPos');
-
     // Create a simple guaranteed solvable path
     List<Offset> solutionPath = _createSimplePath(startPos!, endPos!);
-
-    print('Solution path length: ${solutionPath.length}');
 
     // Assign ascending numbers to the path
     for (int i = 0; i < solutionPath.length; i++) {
@@ -238,25 +223,14 @@ class _NumberPathGameState extends State<NumberPathGame>
       grid[pos.dy.toInt()][pos.dx.toInt()] = i + 1;
     }
 
-    // Fill remaining cells with random numbers (but DON'T overwrite START and END)
+    // Fill remaining cells with random numbers
     for (int y = 0; y < gridSize; y++) {
       for (int x = 0; x < gridSize; x++) {
-        Offset currentPos = Offset(x.toDouble(), y.toDouble());
-        // Skip cells that are already part of the solution path
         if (grid[y][x] == null) {
-          // Random number that could be part of alternate paths
           grid[y][x] = 1 + rand.nextInt(maxNumber);
         }
       }
     }
-
-    // Verify START and END are set
-    print(
-      'Grid at START (${startPos!.dx.toInt()}, ${startPos!.dy.toInt()}): ${grid[startPos!.dy.toInt()][startPos!.dx.toInt()]}',
-    );
-    print(
-      'Grid at END (${endPos!.dx.toInt()}, ${endPos!.dy.toInt()}): ${grid[endPos!.dy.toInt()][endPos!.dx.toInt()]}',
-    );
   }
 
   List<Offset> _createSimplePath(Offset start, Offset end) {
@@ -349,17 +323,12 @@ class _NumberPathGameState extends State<NumberPathGame>
     // Can't move to a cell already in path (except backtracking)
     if (currentPath.contains(pos)) return false;
 
-    // Get current cell value
     int? currentValue =
         grid[currentPath.last.dy.toInt()][currentPath.last.dx.toInt()];
     int? nextValue = grid[y][x];
 
     if (currentValue == null || nextValue == null) return false;
-
-    // Can always move to the END position
     if (pos == endPos) return true;
-
-    // Must move to equal or greater number (ascending rule)
     return nextValue >= currentValue;
   }
 
@@ -380,7 +349,6 @@ class _NumberPathGameState extends State<NumberPathGame>
       puzzlesSolved = 0;
       _updateDifficultyForLevel();
 
-      // Check if grid size changed
       if (oldGridSize != gridSize) {
         gridSizeChanged = true;
       }
@@ -393,157 +361,251 @@ class _NumberPathGameState extends State<NumberPathGame>
     }
   }
 
-  void _showWinDialog() {
+  // --- SHARED DIALOG BUILDER (STANDARD STYLE) ---
+  Widget _buildDialogContent(
+    String title,
+    String message,
+    List<Widget> actions,
+  ) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      child: Stack(
+        alignment: Alignment.topCenter,
+        children: [
+          Container(
+            width: 500,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.green.shade800, width: 4),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 15,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 20),
+                ),
+                const SizedBox(height: 30),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: actions,
+                ),
+              ],
+            ),
+          ),
+          ConfettiWidget(
+            confettiController: _dialogConfettiController,
+            blastDirection: pi / 2,
+            maxBlastForce: 20,
+            minBlastForce: 10,
+            emissionFrequency: 0.2,
+            numberOfParticles: 15,
+            gravity: 0.5,
+            shouldLoop: false,
+            colors: const [Colors.yellow, Colors.lightGreen, Colors.lightBlue],
+            createParticlePath: drawStar,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- UPDATED DIALOGS ---
+
+  void _onTimeUp() {
+    _stopTimer();
+    gameComplete = true;
+
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) {
-        return ThemedGameDialog(
-          title: 'EXCELLENT! 🎉',
-          titleColor: Colors.cyan.shade300,
-          mascotImagePath: 'assets/images/mouthfrog.png',
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'You found the path!',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.cyan.shade50,
-                ),
-                textAlign: TextAlign.center,
+      builder: (context) => _buildDialogContent(
+        '⏳ Time\'s Up!',
+        'You ran out of time. Don\'t give up!',
+        [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
-              const SizedBox(height: 15),
-              Text(
-                'Level $level - Puzzle $puzzlesSolved/2',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.yellow.shade200,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
+            ),
+            child: const Text('Back to Menu', style: TextStyle(fontSize: 16)),
           ),
-          actions: [
-            _buildThemedButton(
-              context,
-              text: 'Next Puzzle',
-              onPressed: () {
-                Navigator.pop(context);
-                _initializeGame();
-              },
-              color: Colors.green.shade700,
+          const SizedBox(width: 20),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _initializeGame();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
-            _buildThemedButton(
-              context,
-              text: 'Back to Menu',
-              onPressed: () {
-                Navigator.pop(context);
-                Navigator.pop(context);
-              },
-              color: Colors.brown.shade700,
+            child: const Text('Try Again', style: TextStyle(fontSize: 16)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showWinDialog() {
+    _bgConfettiController.play();
+    _dialogConfettiController.play();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _buildDialogContent(
+        '🎉 Excellent!',
+        'You found the path! Puzzle $puzzlesSolved/2',
+        [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
-          ],
-        );
-      },
+            child: const Text('Back to Menu', style: TextStyle(fontSize: 16)),
+          ),
+          const SizedBox(width: 20),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _initializeGame();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text('Next Puzzle', style: TextStyle(fontSize: 16)),
+          ),
+        ],
+      ),
     );
   }
 
   void _showLevelUpDialog(String message, bool gridSizeChanged) {
-    // If grid changed, generate new puzzle immediately before showing dialog
+    _bgConfettiController.play();
+    _dialogConfettiController.play();
+
     if (gridSizeChanged) {
-      // Clear game state and generate new grid
       gameComplete = false;
       currentPath.clear();
       _generatePuzzle();
       _startTimer();
-
-      // Force UI update
       setState(() {});
     }
 
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) {
-        return ThemedGameDialog(
-          title: 'LEVEL UP! ⭐',
-          titleColor: Colors.yellow.shade300,
-          mascotImagePath: 'assets/images/mouthfrog.png',
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Amazing work!',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.green.shade50,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 15),
-              Text(
-                message,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.orange.shade200,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-          actions: [
-            _buildThemedButton(
-              context,
-              text: 'Start Level!',
+      builder: (context) =>
+          _buildDialogContent('⭐ Level Up!', 'Amazing work! $message', [
+            ElevatedButton(
               onPressed: () {
                 Navigator.pop(context);
                 if (!gridSizeChanged) {
-                  // Only generate new puzzle if grid size didn't change
                   _initializeGame();
                 }
-                // Grid is already ready to play
               },
-              color: Colors.orange.shade700,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 30,
+                  vertical: 15,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text('Start Level', style: TextStyle(fontSize: 16)),
             ),
-          ],
-        );
-      },
+          ]),
     );
   }
 
-  Widget _buildThemedButton(
-    BuildContext context, {
-    required String text,
-    required VoidCallback onPressed,
-    Color color = Colors.green,
-  }) {
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 5.0),
-        child: ElevatedButton(
-          onPressed: onPressed,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: color,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15),
-              side: BorderSide(color: Colors.yellow.shade200, width: 3),
+  // --- NAVIGATION SAFETY ---
+  Future<void> _onBackButtonPressed() async {
+    _stopTimer();
+    bool? shouldExit = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _buildDialogContent(
+        '🚪 Leaving already?',
+        'Your current progress will be lost!',
+        [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context, false);
+              _startTimer(); // Resume timer
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 15),
-            elevation: 8,
+            child: const Text('Stay & Play', style: TextStyle(fontSize: 16)),
           ),
-          child: Text(
-            text,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+          const SizedBox(width: 20),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context, true);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text('Exit Game', style: TextStyle(fontSize: 16)),
           ),
-        ),
+        ],
       ),
     );
+
+    if (shouldExit == true && mounted) {
+      Navigator.of(context).pop();
+    }
   }
 
   void _resetProgress() {
@@ -557,160 +619,266 @@ class _NumberPathGameState extends State<NumberPathGame>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage("assets/images/swamp_new.png"),
-            fit: BoxFit.cover,
-          ),
-        ),
-        child: Container(
-          color: const Color.fromARGB(255, 112, 155, 131).withOpacity(0.4),
-          child: SafeArea(
-            child: Row(
-              children: [
-                // Left mascot
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.all(20),
-                    child: Center(
-                      child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          return OverflowBox(
-                            maxWidth: double.infinity,
-                            maxHeight: double.infinity,
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 500),
-                              curve: Curves.easeInOut,
-                              transform: Matrix4.translationValues(
-                                gridSize >= 6 ? -1 : (gridSize >= 5 ? 10 : 50),
-                                20,
-                                0,
-                              ),
-                              child: Image.asset(
-                                _mascotFrame == 0
-                                    ? 'assets/images/eyeopenfrog.png'
-                                    : _mascotFrame == 1
-                                    ? 'assets/images/closefrog.png'
-                                    : 'assets/images/mouthfrog.png',
-                                width: constraints.maxWidth * 1.5,
-                                height: constraints.maxHeight * 1.5,
-                                fit: BoxFit.contain,
-                              ),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _onBackButtonPressed();
+      },
+      child: Scaffold(
+        body: Stack(
+          children: [
+            Container(
+              decoration: const BoxDecoration(
+                image: DecorationImage(
+                  image: AssetImage("assets/images/swamp_new.png"),
+                  fit: BoxFit.cover,
+                ),
+              ),
+              child: Container(
+                color: const Color.fromARGB(
+                  255,
+                  112,
+                  155,
+                  131,
+                ).withOpacity(0.4),
+                child: SafeArea(
+                  child: Row(
+                    children: [
+                      // Left mascot
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.all(20),
+                          child: Center(
+                            child: LayoutBuilder(
+                              builder: (context, constraints) {
+                                return OverflowBox(
+                                  maxWidth: double.infinity,
+                                  maxHeight: double.infinity,
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 500),
+                                    curve: Curves.easeInOut,
+                                    transform: Matrix4.translationValues(
+                                      gridSize >= 6
+                                          ? -1
+                                          : (gridSize >= 5 ? 10 : 50),
+                                      20,
+                                      0,
+                                    ),
+                                    child: Image.asset(
+                                      _mascotFrame == 0
+                                          ? 'assets/images/eyeopenfrog.png'
+                                          : _mascotFrame == 1
+                                          ? 'assets/images/closefrog.png'
+                                          : 'assets/images/mouthfrog.png',
+                                      width: constraints.maxWidth * 1.5,
+                                      height: constraints.maxHeight * 1.5,
+                                      fit: BoxFit.contain,
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
-                          );
-                        },
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                ),
-                // Game grid
-                Expanded(
-                  flex: 2,
-                  child: Center(
-                    child: AspectRatio(
-                      aspectRatio: 1,
-                      child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          final cellSize = constraints.maxWidth / gridSize;
-
-                          return Container(
-                            padding: EdgeInsets.all(
-                              constraints.maxWidth * 0.02,
+                      // Game grid
+                      Expanded(
+                        flex: 2,
+                        child: Center(
+                          child: AspectRatio(
+                            aspectRatio: 1,
+                            child: LayoutBuilder(
+                              builder: (context, constraints) {
+                                final cellSize =
+                                    constraints.maxWidth / gridSize;
+                                return Container(
+                                  padding: EdgeInsets.all(
+                                    constraints.maxWidth * 0.02,
+                                  ),
+                                  child: NumberGameGrid(
+                                    key: ValueKey(
+                                      'grid-$gridSize-$level-$puzzlesSolved',
+                                    ),
+                                    grid: grid,
+                                    gridSize: gridSize,
+                                    cellSize: cellSize,
+                                    currentPath: currentPath,
+                                    startPos: startPos!,
+                                    endPos: endPos!,
+                                    onCellTouch: _handleCellTouch,
+                                    onDragEnd: _handleDragEnd,
+                                  ),
+                                );
+                              },
                             ),
-                            child: NumberGameGrid(
-                              key: ValueKey(
-                                'grid-$gridSize-$level-$puzzlesSolved',
-                              ),
-                              grid: grid,
-                              gridSize: gridSize,
-                              cellSize: cellSize,
-                              currentPath: currentPath,
-                              startPos: startPos!,
-                              endPos: endPos!,
-                              onCellTouch: _handleCellTouch,
-                              onDragEnd: _handleDragEnd,
-                            ),
-                          );
-                        },
+                          ),
+                        ),
                       ),
-                    ),
+                      // Right sidebar
+                      Container(
+                        width: 90,
+                        padding: const EdgeInsets.all(8),
+                        child: SingleChildScrollView(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              _buildStatItem("Level", "$level", Icons.star),
+                              const SizedBox(height: 15),
+                              _buildStatItem(
+                                "Puzzle",
+                                "$puzzlesSolved/2",
+                                Icons.extension,
+                              ),
+                              const SizedBox(height: 15),
+                              _buildStatItem(
+                                "Steps",
+                                "${currentPath.length}",
+                                Icons.timeline,
+                              ),
+                              const SizedBox(height: 15),
+                              _buildStatItem(
+                                "Time",
+                                "${_timeRemaining}s",
+                                Icons.timer,
+                              ),
+                              const SizedBox(height: 15),
+                              _buildStatItem(
+                                "Grid",
+                                "${gridSize}×$gridSize",
+                                Icons.grid_4x4,
+                              ),
+                              const SizedBox(height: 20),
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.9),
+                                  borderRadius: BorderRadius.circular(15),
+                                ),
+                                child: IconButton(
+                                  onPressed: _initializeGame,
+                                  icon: const Icon(Icons.refresh),
+                                  color: Colors.green.shade700,
+                                  tooltip: 'New Puzzle',
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              // Explicit Exit Button in Sidebar
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.9),
+                                  borderRadius: BorderRadius.circular(15),
+                                ),
+                                child: IconButton(
+                                  onPressed: _onBackButtonPressed,
+                                  icon: const Icon(Icons.exit_to_app_rounded),
+                                  color: Colors.red.shade700,
+                                  tooltip: 'Exit Game',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                // Right sidebar
-                Container(
-                  width: 90,
-                  padding: const EdgeInsets.all(8),
-                  child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _buildStatItem("Level", "$level", Icons.star),
-                        const SizedBox(height: 15),
-                        _buildStatItem(
-                          "Puzzle",
-                          "$puzzlesSolved/2",
-                          Icons.extension,
-                        ),
-                        const SizedBox(height: 15),
-                        _buildStatItem(
-                          "Steps",
-                          "${currentPath.length}",
-                          Icons.timeline,
-                        ),
-                        const SizedBox(height: 15),
-                        _buildStatItem(
-                          "Time",
-                          "${_timeRemaining}s",
-                          Icons.timer,
-                        ),
-                        const SizedBox(height: 15),
-                        _buildStatItem(
-                          "Grid",
-                          "${gridSize}×$gridSize",
-                          Icons.grid_4x4,
-                        ),
-                        const SizedBox(height: 20),
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.9),
-                            borderRadius: BorderRadius.circular(15),
-                          ),
-                          child: IconButton(
-                            onPressed: _initializeGame,
-                            icon: const Icon(Icons.refresh),
-                            color: Colors.green.shade700,
-                            tooltip: 'New Puzzle',
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.9),
-                            borderRadius: BorderRadius.circular(15),
-                          ),
-                          child: IconButton(
-                            onPressed: _resetProgress,
-                            icon: const Icon(Icons.restart_alt),
-                            color: Colors.orange.shade700,
-                            tooltip: 'Reset Progress',
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
+
+            // --- CONFETTI OVERLAYS ---
+            Align(
+              alignment: Alignment.topCenter,
+              child: ConfettiWidget(
+                confettiController: _bgConfettiController,
+                blastDirection: pi / 2,
+                maxBlastForce: 10,
+                minBlastForce: 5,
+                emissionFrequency: 0.08,
+                numberOfParticles: 30,
+                colors: const [
+                  Colors.green,
+                  Colors.blue,
+                  Colors.pink,
+                  Colors.orange,
+                ],
+                createParticlePath: drawStar,
+              ),
+            ),
+            Align(
+              alignment: Alignment.topLeft,
+              child: ConfettiWidget(
+                confettiController: _bgConfettiController,
+                blastDirection: pi / 3,
+                emissionFrequency: 0.1,
+                numberOfParticles: 25,
+                colors: const [Colors.green, Colors.blue, Colors.pink],
+                createParticlePath: drawStar,
+              ),
+            ),
+            Align(
+              alignment: Alignment.topRight,
+              child: ConfettiWidget(
+                confettiController: _bgConfettiController,
+                blastDirection: 2 * pi / 3,
+                emissionFrequency: 0.1,
+                numberOfParticles: 25,
+                colors: const [Colors.purple, Colors.amber, Colors.red],
+                createParticlePath: drawStar,
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: ConfettiWidget(
+                confettiController: _bgConfettiController,
+                blastDirection: 0,
+                maxBlastForce: 15,
+                emissionFrequency: 0.08,
+                numberOfParticles: 20,
+                colors: const [Colors.yellow, Colors.orange, Colors.red],
+                createParticlePath: drawStar,
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: ConfettiWidget(
+                confettiController: _bgConfettiController,
+                blastDirection: pi,
+                maxBlastForce: 15,
+                emissionFrequency: 0.08,
+                numberOfParticles: 20,
+                colors: const [Colors.blue, Colors.cyan, Colors.purple],
+                createParticlePath: drawStar,
+              ),
+            ),
+            Align(
+              alignment: Alignment.bottomLeft,
+              child: ConfettiWidget(
+                confettiController: _bgConfettiController,
+                blastDirection: -pi / 4,
+                emissionFrequency: 0.08,
+                numberOfParticles: 15,
+                colors: const [Colors.teal, Colors.lime, Colors.indigo],
+                createParticlePath: drawStar,
+              ),
+            ),
+            Align(
+              alignment: Alignment.bottomRight,
+              child: ConfettiWidget(
+                confettiController: _bgConfettiController,
+                blastDirection: -3 * pi / 4,
+                emissionFrequency: 0.08,
+                numberOfParticles: 15,
+                colors: const [Colors.pinkAccent, Colors.deepOrange],
+                createParticlePath: drawStar,
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
   Widget _buildStatItem(String label, String value, IconData icon) {
-    // Special styling for timer when low
     Color valueColor = Colors.green;
     if (label == "Time" && _timeRemaining <= 10) {
       valueColor = Colors.red;
@@ -757,6 +925,8 @@ class _NumberPathGameState extends State<NumberPathGame>
   }
 }
 
+// --- UNCHANGED CORE LOGIC BELOW ---
+
 class NumberGameGrid extends StatefulWidget {
   final List<List<int?>> grid;
   final int gridSize;
@@ -792,7 +962,6 @@ class _NumberGameGridState extends State<NumberGameGrid> {
 
     if (x >= 0 && x < widget.gridSize && y >= 0 && y < widget.gridSize) {
       final cellPos = Offset(x.toDouble(), y.toDouble());
-
       if (lastProcessedCell != cellPos) {
         lastProcessedCell = cellPos;
         widget.onCellTouch(cellPos);
@@ -822,7 +991,6 @@ class _NumberGameGridState extends State<NumberGameGrid> {
         ),
         child: Stack(
           children: [
-            // Path line layer
             if (widget.currentPath.length > 1)
               CustomPaint(
                 size: Size(
@@ -831,7 +999,6 @@ class _NumberGameGridState extends State<NumberGameGrid> {
                 ),
                 painter: NumberPathPainter(widget.currentPath, widget.cellSize),
               ),
-            // Grid cells
             GridView.builder(
               physics: const NeverScrollableScrollPhysics(),
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -968,140 +1135,6 @@ class NumberPathPainter extends CustomPainter {
   bool shouldRepaint(CustomPainter oldDelegate) => true;
 }
 
-// --- Themed Game Dialog Widget (Matching Card Game Style) ---
-class ThemedGameDialog extends StatelessWidget {
-  final String title;
-  final Widget content;
-  final List<Widget> actions;
-  final Color titleColor;
-  final String mascotImagePath;
-
-  const ThemedGameDialog({
-    super.key,
-    required this.title,
-    required this.content,
-    required this.actions,
-    this.titleColor = Colors.white,
-    this.mascotImagePath = 'assets/images/eyeopenfrog.png',
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
-
-    // Make the dialog very large, but responsive
-    final dialogWidth = screenWidth * 0.8;
-    final dialogHeight = screenHeight * 0.85;
-
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: dialogWidth,
-          maxHeight: dialogHeight,
-        ),
-        child: Stack(
-          alignment: Alignment.topCenter,
-          children: [
-            // 1. The Main Content Box (Wooden/Mossy Look)
-            Container(
-              margin: const EdgeInsets.only(
-                top: 50,
-              ), // Space for the title banner
-              decoration: BoxDecoration(
-                // Dark, swampy gradient for the body
-                gradient: LinearGradient(
-                  colors: [Colors.brown.shade800, Colors.green.shade900],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-                borderRadius: BorderRadius.circular(25),
-                border: Border.all(color: Colors.brown.shade600, width: 8),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.6),
-                    blurRadius: 15,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
-              ),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(25, 75, 25, 25),
-                child: Column(
-                  mainAxisSize: MainAxisSize.max,
-                  children: [
-                    // Content Area - Use SingleChildScrollView + Flexible for safety
-                    Flexible(child: SingleChildScrollView(child: content)),
-                    const SizedBox(height: 20),
-                    // Actions Row (buttons)
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: actions,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // 2. The Title Header/Banner
-            Positioned(
-              top: 0,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 12,
-                  horizontal: 30,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.green.shade700,
-                  borderRadius: BorderRadius.circular(50),
-                  border: Border.all(color: Colors.yellow.shade700, width: 4),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.5),
-                      blurRadius: 8,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
-                ),
-                child: Text(
-                  title,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w900,
-                    color: titleColor,
-                    shadows: const [
-                      Shadow(
-                        offset: Offset(2, 2),
-                        blurRadius: 2.0,
-                        color: Colors.black,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            // 3. The Mascot Image
-            Positioned(
-              top: 35,
-              right: 15,
-              child: Image.asset(
-                mascotImagePath,
-                width: 70,
-                height: 70,
-                fit: BoxFit.contain,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 // Transition Video Player Widget
 class TransitionVideoPlayer extends StatefulWidget {
   final VoidCallback onComplete;
@@ -1120,15 +1153,12 @@ class _TransitionVideoPlayerState extends State<TransitionVideoPlayer> {
   @override
   void initState() {
     super.initState();
-    print('Initializing transition video...');
-
     _controller =
         VideoPlayerController.asset('assets/videos/test_transition.mp4')
           ..setLooping(false)
           ..initialize()
               .then((_) {
                 if (mounted) {
-                  print('Video initialized successfully');
                   setState(() {
                     _isInitialized = true;
                   });
@@ -1136,8 +1166,6 @@ class _TransitionVideoPlayerState extends State<TransitionVideoPlayer> {
                 }
               })
               .catchError((error) {
-                print('Error initializing video: $error');
-                // If video fails to load, just continue to next level
                 if (!_hasCompleted) {
                   _hasCompleted = true;
                   widget.onComplete();
@@ -1150,10 +1178,8 @@ class _TransitionVideoPlayerState extends State<TransitionVideoPlayer> {
   void _checkVideoProgress() {
     if (!mounted || _hasCompleted) return;
 
-    // Check if video has finished playing
     if (_controller.value.isInitialized &&
         _controller.value.position >= _controller.value.duration) {
-      print('Video completed');
       _hasCompleted = true;
       widget.onComplete();
     }

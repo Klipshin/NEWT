@@ -1,10 +1,8 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
-
-// NOTE: The AudioPlayer imports are still commented out
-// as they were in your original 'ColorFloodGame' to avoid
-// external package/asset issues.
+import 'package:audioplayers/audioplayers.dart'; // Enabled
+import 'package:confetti/confetti.dart'; // Added
 
 class ColorFloodGame extends StatefulWidget {
   const ColorFloodGame({super.key});
@@ -21,9 +19,9 @@ class _ColorFloodGameState extends State<ColorFloodGame>
 
   // Game state variables for Color Flood
   late List<List<String>> grid;
-  late int movesLimit; // Max moves allowed for the current level
+  late int movesLimit;
   late int movesMade;
-  late int timeLimit; // Seconds
+  late int timeLimit;
   late int timeLeft;
   Timer? _gameTimer;
 
@@ -31,16 +29,21 @@ class _ColorFloodGameState extends State<ColorFloodGame>
   late List<String> colors;
   late Map<String, Color> colorMap;
 
+  // --- NEW: Audio & Effects ---
+  late AudioPlayer _bgMusicPlayer;
+  late ConfettiController _bgConfettiController;
+  late ConfettiController _dialogConfettiController;
+
   // Extended color styles
   int currentStyle = 0;
   final List<Map<String, Color>> colorStyles = [
     {
-      "red": const Color(0xFFFF6B6B), // Light Red
-      "blue": const Color(0xFF4C57FC), // Vibrant Blue
-      "yellow": const Color(0xFFFFE66D), // Soft Yellow
-      "pink": const Color.fromARGB(255, 208, 110, 228), // Purple Pink
-      "green": const Color(0xFF95E1D3), // Seafoam Green
-      "orange": const Color(0xFFFFAA5A), // Bright Orange
+      "red": const Color(0xFFFF6B6B),
+      "blue": const Color(0xFF4C57FC),
+      "yellow": const Color(0xFFFFE66D),
+      "pink": const Color.fromARGB(255, 208, 110, 228),
+      "green": const Color(0xFF95E1D3),
+      "orange": const Color(0xFFFFAA5A),
     },
     {
       "red": const Color.fromARGB(255, 224, 41, 41),
@@ -55,6 +58,19 @@ class _ColorFloodGameState extends State<ColorFloodGame>
   @override
   void initState() {
     super.initState();
+
+    // Initialize Confetti
+    _bgConfettiController = ConfettiController(
+      duration: const Duration(seconds: 3),
+    );
+    _dialogConfettiController = ConfettiController(
+      duration: const Duration(seconds: 1),
+    );
+
+    // Initialize Audio
+    _bgMusicPlayer = AudioPlayer();
+    _playBackgroundMusic();
+
     colorMap = colorStyles[currentStyle];
     _updateLevelConfig();
     _initializeGame();
@@ -63,35 +79,68 @@ class _ColorFloodGameState extends State<ColorFloodGame>
   @override
   void dispose() {
     _gameTimer?.cancel();
+    _bgMusicPlayer.dispose();
+    _bgConfettiController.dispose();
+    _dialogConfettiController.dispose();
     super.dispose();
+  }
+
+  Future<void> _playBackgroundMusic() async {
+    await _bgMusicPlayer.setReleaseMode(ReleaseMode.loop);
+    // Using a calm track for logic puzzles
+    await _bgMusicPlayer.play(AssetSource('sounds/dots.mp3'));
+  }
+
+  // --- STAR PATH FOR CONFETTI ---
+  Path drawStar(Size size) {
+    double cx = size.width / 2;
+    double cy = size.height / 2;
+    double outerRadius = size.width / 2;
+    double innerRadius = size.width / 5;
+
+    Path path = Path();
+    double rot = pi / 2 * 3;
+    double step = pi / 5;
+
+    path.moveTo(cx, cy - outerRadius);
+    for (int i = 0; i < 5; i++) {
+      double x = cx + cos(rot) * outerRadius;
+      double y = cy + sin(rot) * outerRadius;
+      path.lineTo(x, y);
+      rot += step;
+
+      x = cx + cos(rot) * innerRadius;
+      y = cy + sin(rot) * innerRadius;
+      path.lineTo(x, y);
+      rot += step;
+    }
+    path.close();
+    return path;
   }
 
   // --- Level Progression and Configuration ---
 
   void _updateLevelConfig() {
-    // Set grid size and number of colors based on level
     if (level == 1) {
       gridSize = 4;
-      colors = ["red", "blue", "yellow"]; // 3 Colors
+      colors = ["red", "blue", "yellow"];
     } else if (level == 2) {
       gridSize = 4;
-      colors = ["red", "blue", "yellow", "pink"]; // 4 Colors
+      colors = ["red", "blue", "yellow", "pink"];
     } else if (level == 3) {
       gridSize = 5;
-      colors = ["red", "blue", "yellow", "pink"]; // 4 Colors
+      colors = ["red", "blue", "yellow", "pink"];
     } else if (level == 4) {
       gridSize = 5;
-      colors = ["red", "blue", "yellow", "pink", "green"]; // 5 Colors
+      colors = ["red", "blue", "yellow", "pink", "green"];
     } else if (level >= 5) {
       gridSize = 6;
-      colors = ["red", "blue", "yellow", "pink", "green", "orange"]; // 6 Colors
+      colors = ["red", "blue", "yellow", "pink", "green", "orange"];
     }
 
-    // Progressive difficulty: Moves Limit
     if (level <= 3) {
-      // Levels 1-3: No move limit, focus on speed (timer)
       movesLimit = 999;
-      timeLimit = 45 - (level - 1) * 5; // Start at 45s, decrease by 5s
+      timeLimit = 45 - (level - 1) * 5;
     } else if (level == 4) {
       movesLimit = 25;
       timeLimit = 40;
@@ -110,12 +159,15 @@ class _ColorFloodGameState extends State<ColorFloodGame>
   // --- Game Initialization and Reset ---
 
   void _initializeGame() {
-    _gameTimer?.cancel(); // Stop any existing timer
+    _gameTimer?.cancel();
+
+    // Stop effects
+    _bgConfettiController.stop();
+    _dialogConfettiController.stop();
 
     movesMade = 0;
     timeLeft = timeLimit;
 
-    // Change style for variation
     currentStyle = (currentStyle + 1) % colorStyles.length;
     colorMap = colorStyles[currentStyle];
 
@@ -156,10 +208,7 @@ class _ColorFloodGameState extends State<ColorFloodGame>
   void _handleColorSelection(String newColor) {
     final targetColor = grid[0][0];
 
-    // Check if game is already over
     if (timeLeft <= 0 || (level >= 4 && movesMade >= movesLimit)) return;
-
-    // Don't waste a move if the color is already the current color
     if (newColor == targetColor) return;
 
     movesMade++;
@@ -192,11 +241,10 @@ class _ColorFloodGameState extends State<ColorFloodGame>
 
     grid[row][col] = replacementColor;
 
-    // 4-way connectivity
-    _applyFloodFill(row + 1, col, targetColor, replacementColor); // Down
-    _applyFloodFill(row - 1, col, targetColor, replacementColor); // Up
-    _applyFloodFill(row, col + 1, targetColor, replacementColor); // Right
-    _applyFloodFill(row, col - 1, targetColor, replacementColor); // Left
+    _applyFloodFill(row + 1, col, targetColor, replacementColor);
+    _applyFloodFill(row - 1, col, targetColor, replacementColor);
+    _applyFloodFill(row, col + 1, targetColor, replacementColor);
+    _applyFloodFill(row, col - 1, targetColor, replacementColor);
   }
 
   bool _checkComplete() {
@@ -211,8 +259,6 @@ class _ColorFloodGameState extends State<ColorFloodGame>
     return true;
   }
 
-  // --- Game State Management and Dialogs ---
-
   void _onPuzzleComplete() {
     puzzlesSolved++;
 
@@ -224,7 +270,7 @@ class _ColorFloodGameState extends State<ColorFloodGame>
       level++;
       puzzlesSolved = 0;
       shouldLevelUp = true;
-      _updateLevelConfig(); // Update config before showing dialog
+      _updateLevelConfig();
       levelUpMessage = 'Level $level: ${_getLevelDescription()}';
     }
 
@@ -242,157 +288,139 @@ class _ColorFloodGameState extends State<ColorFloodGame>
     return "Moves LIMITED: $movesLimit";
   }
 
-  // Themed Dialog Functions (Copied/Adapted from ConnectDotsGame)
-
-  Widget _buildThemedButton(
-    BuildContext context, {
-    required String text,
-    required VoidCallback onPressed,
-    Color color = Colors.green,
-  }) {
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 5.0),
-        child: ElevatedButton(
-          onPressed: onPressed,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: color,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15),
-              side: BorderSide(color: Colors.yellow.shade200, width: 3),
+  // --- SHARED DIALOG BUILDER (Standard Style) ---
+  Widget _buildDialogContent(
+    String title,
+    String message,
+    List<Widget> actions,
+  ) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      child: Stack(
+        alignment: Alignment.topCenter,
+        children: [
+          Container(
+            width: 500,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.green.shade800, width: 4),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 15,
+                  offset: const Offset(0, 8),
+                ),
+              ],
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 15),
-            elevation: 8,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 20),
+                ),
+                const SizedBox(height: 30),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: actions,
+                ),
+              ],
+            ),
           ),
-          child: Text(
-            text,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+          ConfettiWidget(
+            confettiController: _dialogConfettiController,
+            blastDirection: pi / 2,
+            maxBlastForce: 20,
+            minBlastForce: 10,
+            emissionFrequency: 0.2,
+            numberOfParticles: 15,
+            gravity: 0.5,
+            shouldLoop: false,
+            colors: const [Colors.yellow, Colors.lightGreen, Colors.lightBlue],
+            createParticlePath: drawStar,
           ),
-        ),
+        ],
       ),
     );
   }
 
+  // --- UPDATED DIALOGS ---
+
   void _showWinDialog() {
+    _bgConfettiController.play();
+    _dialogConfettiController.play();
+
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) {
-        return ThemedGameDialog(
-          title: 'PERFECT! 🎉',
-          titleColor: Colors.cyan.shade300,
-          mascotImagePath: 'assets/images/mouthfrog.png',
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Board flooded in $movesMade moves!',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.cyan.shade50,
-                ),
-                textAlign: TextAlign.center,
+      builder: (context) => _buildDialogContent(
+        '🎉 Perfect!',
+        'Board flooded in $movesMade moves! Puzzle $puzzlesSolved/2',
+        [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _initializeGame();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
-              const SizedBox(height: 15),
-              Text(
-                'Level $level - Puzzle $puzzlesSolved/2',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.yellow.shade200,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-          actions: [
-            _buildThemedButton(
-              context,
-              text: 'Next Puzzle',
-              onPressed: () {
-                Navigator.pop(context);
-                _initializeGame();
-              },
-              color: Colors.green.shade700,
             ),
-            // Example of Back to Menu button (requires navigation logic to work)
-            // _buildThemedButton(
-            //   context,
-            //   text: 'Back to Menu',
-            //   onPressed: () => Navigator.pop(context),
-            //   color: Colors.brown.shade700,
-            // ),
-          ],
-        );
-      },
+            child: const Text('Next Puzzle', style: TextStyle(fontSize: 16)),
+          ),
+        ],
+      ),
     );
   }
 
   void _showLevelUpDialog(String message, bool gridSizeChanged) {
-    // If grid changed, generate new puzzle immediately before showing dialog
+    _bgConfettiController.play();
+    _dialogConfettiController.play();
+
     if (gridSizeChanged) {
-      _initializeGame(); // Re-initializes with the new grid size and generates new board
+      _initializeGame();
     }
 
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) {
-        return ThemedGameDialog(
-          title: 'LEVEL UP! ⭐',
-          titleColor: Colors.yellow.shade300,
-          mascotImagePath: 'assets/images/mouthfrog.png',
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'New Challenge Awaits!',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.green.shade50,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 15),
-              Text(
-                message,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.orange.shade200,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              Text(
-                'Grid: ${gridSize}x$gridSize',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.yellow.shade200,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-          actions: [
-            _buildThemedButton(
-              context,
-              text: 'Start Level!',
+      builder: (context) =>
+          _buildDialogContent('⭐ Level Up!', 'New Challenge: $message', [
+            ElevatedButton(
               onPressed: () {
                 Navigator.pop(context);
                 if (!gridSizeChanged) {
-                  _initializeGame(); // Only re-initialize game if the grid size wasn't changed
+                  _initializeGame();
                 }
-                // If grid size changed, it was already initialized above
               },
-              color: Colors.orange.shade700,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 30,
+                  vertical: 15,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text('Start Level', style: TextStyle(fontSize: 16)),
             ),
-          ],
-        );
-      },
+          ]),
     );
   }
 
@@ -400,54 +428,77 @@ class _ColorFloodGameState extends State<ColorFloodGame>
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) {
-        return ThemedGameDialog(
-          title: 'GAME OVER! 😥',
-          titleColor: Colors.red.shade300,
-          mascotImagePath: 'assets/images/closefrog.png',
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                reason,
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.red.shade50,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 15),
-              Text(
-                'Current Level: $level',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.yellow.shade200,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-          actions: [
-            _buildThemedButton(
-              context,
-              text: 'Try Again',
+      builder: (context) =>
+          _buildDialogContent('😥 Game Over!', '$reason Try again.', [
+            ElevatedButton(
               onPressed: () {
                 Navigator.pop(context);
-                // Restart current level
                 _updateLevelConfig();
                 _initializeGame();
               },
-              color: Colors.red.shade700,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 30,
+                  vertical: 15,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text('Try Again', style: TextStyle(fontSize: 16)),
             ),
-          ],
-        );
-      },
+          ]),
     );
   }
 
-  // --- Build Method ---
+  // --- NAVIGATION SAFETY ---
+  Future<void> _onBackButtonPressed() async {
+    _gameTimer?.cancel(); // Pause timer
+
+    bool? shouldExit = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _buildDialogContent(
+        '🚪 Leaving already?',
+        'Your current game progress will be lost!',
+        [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context, false);
+              _startGameTimer(); // Resume timer
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text('Stay & Play', style: TextStyle(fontSize: 16)),
+          ),
+          const SizedBox(width: 20),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context, true);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text('Exit Game', style: TextStyle(fontSize: 16)),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldExit == true && mounted) {
+      Navigator.of(context).pop();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -457,132 +508,253 @@ class _ColorFloodGameState extends State<ColorFloodGame>
         : '$movesMade';
     final movesLabel = level >= 4 ? "Moves Left" : "Moves Made";
 
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage("assets/images/swamp_new.png"),
-            fit: BoxFit.cover,
-          ),
-        ),
-        child: Container(
-          color: const Color.fromARGB(255, 112, 155, 131).withOpacity(0.4),
-          child: SafeArea(
-            child: Row(
-              children: [
-                // Left Sidebar: Stats and Reset
-                Container(
-                  width: 100,
-                  padding: const EdgeInsets.all(8),
-                  child: SingleChildScrollView(
-                    // Added to prevent overflow
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      children: [
-                        _buildStatItem(
-                          "Level",
-                          "$level",
-                          Icons.star,
-                          Colors.blue.shade700,
-                        ),
-                        const SizedBox(height: 15),
-                        _buildStatItem(
-                          "Time",
-                          "$timeLeft s",
-                          Icons.timer,
-                          timeLeft <= 10 ? Colors.red : Colors.green.shade700,
-                        ),
-                        const SizedBox(height: 15),
-                        _buildStatItem(
-                          movesLabel,
-                          movesDisplay,
-                          Icons.change_circle,
-                          level >= 4 && currentMovesLeft <= 5
-                              ? Colors.red
-                              : Colors.orange.shade700,
-                        ),
-                        const SizedBox(height: 20),
-                        // Refresh Button
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.9),
-                            borderRadius: BorderRadius.circular(15),
-                          ),
-                          child: IconButton(
-                            onPressed: _initializeGame,
-                            icon: const Icon(Icons.refresh),
-                            color: Colors.purple.shade700,
-                            tooltip: 'New Puzzle',
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _onBackButtonPressed();
+      },
+      child: Scaffold(
+        body: Stack(
+          children: [
+            Container(
+              decoration: const BoxDecoration(
+                image: DecorationImage(
+                  image: AssetImage("assets/images/swamp_new.png"),
+                  fit: BoxFit.cover,
                 ),
-                // Game grid
-                Expanded(
-                  flex: 2,
-                  child: Center(
-                    child: AspectRatio(
-                      aspectRatio: 1,
-                      child: Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          // Key change ensures full grid rebuild on size change
-                          key: ValueKey('grid-$gridSize-$level'),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.black, width: 2),
-                            borderRadius: BorderRadius.circular(8),
-                            boxShadow: const [
-                              BoxShadow(color: Colors.black26, blurRadius: 10),
-                            ],
-                            color: Colors.white.withOpacity(
-                              0.7,
-                            ), // Background for the grid
-                          ),
-                          child: GridView.builder(
-                            physics: const NeverScrollableScrollPhysics(),
-                            gridDelegate:
-                                SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: gridSize,
-                                  childAspectRatio: 1,
-                                  crossAxisSpacing: 1.0,
-                                  mainAxisSpacing: 1.0,
+              ),
+              child: Container(
+                color: const Color.fromARGB(
+                  255,
+                  112,
+                  155,
+                  131,
+                ).withOpacity(0.4),
+                child: SafeArea(
+                  child: Row(
+                    children: [
+                      // Left Sidebar: Stats and Reset
+                      Container(
+                        width: 100,
+                        padding: const EdgeInsets.all(8),
+                        child: SingleChildScrollView(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.start,
+                            children: [
+                              _buildStatItem(
+                                "Level",
+                                "$level",
+                                Icons.star,
+                                Colors.blue.shade700,
+                              ),
+                              const SizedBox(height: 15),
+                              _buildStatItem(
+                                "Time",
+                                "$timeLeft s",
+                                Icons.timer,
+                                timeLeft <= 10
+                                    ? Colors.red
+                                    : Colors.green.shade700,
+                              ),
+                              const SizedBox(height: 15),
+                              _buildStatItem(
+                                movesLabel,
+                                movesDisplay,
+                                Icons.change_circle,
+                                level >= 4 && currentMovesLeft <= 5
+                                    ? Colors.red
+                                    : Colors.orange.shade700,
+                              ),
+                              const SizedBox(height: 20),
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.9),
+                                  borderRadius: BorderRadius.circular(15),
                                 ),
-                            itemCount: gridSize * gridSize,
-                            itemBuilder: (context, index) {
-                              int x = index % gridSize;
-                              int y = index ~/ gridSize;
-                              String colorName = grid[y][x];
-                              Color color = colorMap[colorName] ?? Colors.grey;
-
-                              return Container(color: color);
-                            },
+                                child: IconButton(
+                                  onPressed: _initializeGame,
+                                  icon: const Icon(Icons.refresh),
+                                  color: Colors.purple.shade700,
+                                  tooltip: 'New Puzzle',
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.9),
+                                  borderRadius: BorderRadius.circular(15),
+                                ),
+                                child: IconButton(
+                                  onPressed: _onBackButtonPressed,
+                                  icon: const Icon(Icons.exit_to_app_rounded),
+                                  color: Colors.red.shade700,
+                                  tooltip: 'Exit Game',
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
-                    ),
+
+                      // Game grid
+                      Expanded(
+                        flex: 2,
+                        child: Center(
+                          child: AspectRatio(
+                            aspectRatio: 1,
+                            child: Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 300),
+                                key: ValueKey('grid-$gridSize-$level'),
+                                decoration: BoxDecoration(
+                                  border: Border.all(
+                                    color: Colors.black,
+                                    width: 2,
+                                  ),
+                                  borderRadius: BorderRadius.circular(8),
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color: Colors.black26,
+                                      blurRadius: 10,
+                                    ),
+                                  ],
+                                  color: Colors.white.withOpacity(0.7),
+                                ),
+                                child: GridView.builder(
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  gridDelegate:
+                                      SliverGridDelegateWithFixedCrossAxisCount(
+                                        crossAxisCount: gridSize,
+                                        childAspectRatio: 1,
+                                        crossAxisSpacing: 1.0,
+                                        mainAxisSpacing: 1.0,
+                                      ),
+                                  itemCount: gridSize * gridSize,
+                                  itemBuilder: (context, index) {
+                                    int x = index % gridSize;
+                                    int y = index ~/ gridSize;
+                                    String colorName = grid[y][x];
+                                    Color color =
+                                        colorMap[colorName] ?? Colors.grey;
+
+                                    return Container(color: color);
+                                  },
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // Right Sidebar: Color Palette
+                      Container(
+                        width: 100,
+                        padding: const EdgeInsets.all(8),
+                        child: SingleChildScrollView(
+                          child: _buildColorPalette(),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                // Right Sidebar: Color Palette (Fixed Overflow)
-                Container(
-                  width: 100,
-                  padding: const EdgeInsets.all(8),
-                  child: SingleChildScrollView(
-                    // FIX: Added SingleChildScrollView here
-                    child: _buildColorPalette(),
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
+
+            // --- CONFETTI OVERLAYS ---
+            Align(
+              alignment: Alignment.topCenter,
+              child: ConfettiWidget(
+                confettiController: _bgConfettiController,
+                blastDirection: pi / 2,
+                maxBlastForce: 10,
+                minBlastForce: 5,
+                emissionFrequency: 0.08,
+                numberOfParticles: 30,
+                colors: const [
+                  Colors.green,
+                  Colors.blue,
+                  Colors.pink,
+                  Colors.orange,
+                ],
+                createParticlePath: drawStar,
+              ),
+            ),
+            Align(
+              alignment: Alignment.topLeft,
+              child: ConfettiWidget(
+                confettiController: _bgConfettiController,
+                blastDirection: pi / 3,
+                emissionFrequency: 0.1,
+                numberOfParticles: 25,
+                colors: const [Colors.green, Colors.blue, Colors.pink],
+                createParticlePath: drawStar,
+              ),
+            ),
+            Align(
+              alignment: Alignment.topRight,
+              child: ConfettiWidget(
+                confettiController: _bgConfettiController,
+                blastDirection: 2 * pi / 3,
+                emissionFrequency: 0.1,
+                numberOfParticles: 25,
+                colors: const [Colors.purple, Colors.amber, Colors.red],
+                createParticlePath: drawStar,
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: ConfettiWidget(
+                confettiController: _bgConfettiController,
+                blastDirection: 0,
+                maxBlastForce: 15,
+                emissionFrequency: 0.08,
+                numberOfParticles: 20,
+                colors: const [Colors.yellow, Colors.orange, Colors.red],
+                createParticlePath: drawStar,
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: ConfettiWidget(
+                confettiController: _bgConfettiController,
+                blastDirection: pi,
+                maxBlastForce: 15,
+                emissionFrequency: 0.08,
+                numberOfParticles: 20,
+                colors: const [Colors.blue, Colors.cyan, Colors.purple],
+                createParticlePath: drawStar,
+              ),
+            ),
+            Align(
+              alignment: Alignment.bottomLeft,
+              child: ConfettiWidget(
+                confettiController: _bgConfettiController,
+                blastDirection: -pi / 4,
+                emissionFrequency: 0.08,
+                numberOfParticles: 15,
+                colors: const [Colors.teal, Colors.lime, Colors.indigo],
+                createParticlePath: drawStar,
+              ),
+            ),
+            Align(
+              alignment: Alignment.bottomRight,
+              child: ConfettiWidget(
+                confettiController: _bgConfettiController,
+                blastDirection: -3 * pi / 4,
+                emissionFrequency: 0.08,
+                numberOfParticles: 15,
+                colors: const [Colors.pinkAccent, Colors.deepOrange],
+                createParticlePath: drawStar,
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  // --- Themed Game Dialog Widget (from ConnectDotsGame) ---
   Widget _buildStatItem(
     String label,
     String value,
@@ -632,7 +804,6 @@ class _ColorFloodGameState extends State<ColorFloodGame>
   }
 
   Widget _buildColorPalette() {
-    // FIX: Removed SingleChildScrollView wrapper from here, as it's now around the Column in build()
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: colors.map((colorName) {
@@ -667,141 +838,6 @@ class _ColorFloodGameState extends State<ColorFloodGame>
           ),
         );
       }).toList(),
-    );
-  }
-}
-
-// --- Themed Game Dialog Widget (Matching Card Game Style) ---
-// This class is copied directly from your ConnectDotsGame for consistent styling.
-class ThemedGameDialog extends StatelessWidget {
-  final String title;
-  final Widget content;
-  final List<Widget> actions;
-  final Color titleColor;
-  final String mascotImagePath;
-
-  const ThemedGameDialog({
-    super.key,
-    required this.title,
-    required this.content,
-    required this.actions,
-    this.titleColor = Colors.white,
-    this.mascotImagePath = 'assets/images/eyeopenfrog.png',
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
-
-    // Make the dialog very large, but responsive
-    final dialogWidth = screenWidth * 0.8;
-    final dialogHeight = screenHeight * 0.85;
-
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: dialogWidth,
-          maxHeight: dialogHeight,
-        ),
-        child: Stack(
-          alignment: Alignment.topCenter,
-          children: [
-            // 1. The Main Content Box (Wooden/Mossy Look)
-            Container(
-              margin: const EdgeInsets.only(
-                top: 50,
-              ), // Space for the title banner
-              decoration: BoxDecoration(
-                // Dark, swampy gradient for the body
-                gradient: LinearGradient(
-                  colors: [Colors.brown.shade800, Colors.green.shade900],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-                borderRadius: BorderRadius.circular(25),
-                border: Border.all(color: Colors.brown.shade600, width: 8),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.6),
-                    blurRadius: 15,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
-              ),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(25, 75, 25, 25),
-                child: Column(
-                  mainAxisSize: MainAxisSize.max,
-                  children: [
-                    // Content Area - Use SingleChildScrollView + Flexible for safety
-                    Flexible(child: SingleChildScrollView(child: content)),
-                    const SizedBox(height: 20),
-                    // Actions Row (buttons)
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: actions,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // 2. The Title Header/Banner
-            Positioned(
-              top: 0,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 12,
-                  horizontal: 30,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.green.shade700,
-                  borderRadius: BorderRadius.circular(50),
-                  border: Border.all(color: Colors.yellow.shade700, width: 4),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.5),
-                      blurRadius: 8,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
-                ),
-                child: Text(
-                  title,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w900,
-                    color: titleColor,
-                    shadows: const [
-                      Shadow(
-                        offset: Offset(2, 2),
-                        blurRadius: 2.0,
-                        color: Colors.black,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            // 3. The Mascot Image
-            Positioned(
-              top: 35,
-              right: 15,
-              child: Image.asset(
-                mascotImagePath,
-                width: 70,
-                height: 70,
-                fit: BoxFit.contain,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

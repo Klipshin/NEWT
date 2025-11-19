@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:newt_2/pages/storybooks.dart';
 import 'games_menu.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:zoom_tap_animation/zoom_tap_animation.dart';
 
 class LandingPage extends StatefulWidget {
   const LandingPage({super.key});
@@ -11,7 +12,9 @@ class LandingPage extends StatefulWidget {
 }
 
 class _LandingPageState extends State<LandingPage> {
-  final AudioPlayer _audioPlayer = AudioPlayer();
+  final AudioPlayer _audioPlayer = AudioPlayer(); // For Music
+  final AudioPlayer _sfxPlayer = AudioPlayer(); // For Sound Effects (NEW)
+
   bool _isPlaying = true;
   double _swayValue = -0.1;
   bool _bounceUp = true;
@@ -23,6 +26,8 @@ class _LandingPageState extends State<LandingPage> {
     _startSwaying();
     _startBouncing();
   }
+
+  // ... (Keep _startBouncing, _startSwaying, _playMusic, _toggleSound as they were) ...
 
   void _startBouncing() {
     Future.doWhile(() async {
@@ -67,37 +72,28 @@ class _LandingPageState extends State<LandingPage> {
     });
   }
 
-  // --- NEW FUNCTION TO HANDLE NAVIGATION & SOUND ---
   void _navigateToGames() async {
-    if (_isPlaying) _audioPlayer.pause(); // Pause music
-
-    // Go to the Games page and wait until we come back
+    if (_isPlaying) _audioPlayer.pause();
     await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const GamesMenu()),
     );
-
-    // When we come back, resume music (if it was on)
     if (_isPlaying) _audioPlayer.resume();
   }
 
-  // --- NEW FUNCTION TO HANDLE NAVIGATION & SOUND ---
   void _navigateToStorybooks() async {
-    if (_isPlaying) _audioPlayer.pause(); // Pause music
-
-    // Go to the Storybooks page and wait until we come back
+    if (_isPlaying) _audioPlayer.pause();
     await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const StoryBooksPage()),
     );
-
-    // When we come back, resume music (if it was on)
     if (_isPlaying) _audioPlayer.resume();
   }
 
   @override
   void dispose() {
     _audioPlayer.dispose();
+    _sfxPlayer.dispose(); // Don't forget to dispose the SFX player too!
     super.dispose();
   }
 
@@ -106,11 +102,10 @@ class _LandingPageState extends State<LandingPage> {
     return Scaffold(
       body: Stack(
         children: [
-          //Background
+          // Background
           Positioned.fill(
             child: Opacity(
-              // <--- WRAP WITH THIS WIDGET
-              opacity: 0.82, // <--- SET TO 80%
+              opacity: 0.82,
               child: Image.asset(
                 'assets/images/landingv00.png',
                 fit: BoxFit.cover,
@@ -118,17 +113,26 @@ class _LandingPageState extends State<LandingPage> {
             ),
           ),
 
-          // Logo (NEW)
+          // Logo (NEWT WITH POP SOUND)
           Positioned(
-            top: 5, // At the top
-            left: 0, // Centered
-            right: 0, // Centered
+            top: 5,
+            left: 0,
+            right: 0,
             child: Center(
-              child: Image.asset('assets/images/newt3.png', width: 350),
+              child: ZoomTapAnimation(
+                begin: 1.0,
+                end: 0.90, // Shrink slightly when tapped
+                onTap: () {
+                  // Play the pop sound using the separate SFX player
+                  // Assuming pop.mp3 is in assets/sounds/
+                  _sfxPlayer.play(AssetSource('sounds/pop.mp3'));
+                },
+                child: Image.asset('assets/images/newt3.png', width: 350),
+              ),
             ),
           ),
 
-          //Play
+          // Play Button
           Positioned(
             top: MediaQuery.of(context).size.height * 0.60,
             left: 0,
@@ -146,7 +150,7 @@ class _LandingPageState extends State<LandingPage> {
             ),
           ),
 
-          //Story Time (MOVED & ENLARGED)
+          // Story Time Button
           Positioned(
             top: MediaQuery.of(context).size.height * 0.50,
             left: MediaQuery.of(context).size.width * 0.05,
@@ -160,7 +164,8 @@ class _LandingPageState extends State<LandingPage> {
               ),
             ),
           ),
-          //Sound
+
+          // Sound Toggle
           Positioned(
             bottom: 25,
             right: 25,

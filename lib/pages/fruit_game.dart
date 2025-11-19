@@ -3,6 +3,7 @@ import 'dart:math';
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:audioplayers/audioplayers.dart';
+import 'package:confetti/confetti.dart'; // Import confetti
 
 class FruitGame extends StatefulWidget {
   const FruitGame({super.key});
@@ -24,7 +25,6 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
   Offset fruitPosition = Offset.zero;
   bool isDragging = false;
   late AudioPlayer _bgMusicPlayer;
-  bool _isMuted = false;
 
   // Poof animation controller
   late AnimationController _poofController;
@@ -32,8 +32,12 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
   late Animation<double> _poofOpacity;
   bool showPoof = false;
 
-  // Frog mascot animation states (same as card game)
-  int _frogFrame = 0; // 0 = eyeopen, 1 = close, 2 = mouth
+  // Frog mascot animation states
+  int _frogFrame = 0;
+
+  // CONFETTI CONTROLLERS
+  late ConfettiController _confettiController;
+  late ConfettiController _dialogConfettiController;
 
   final GlobalKey cherryBasketKey = GlobalKey();
   final GlobalKey blueberryBasketKey = GlobalKey();
@@ -45,6 +49,15 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+
+    // Initialize Confetti
+    _confettiController = ConfettiController(
+      duration: const Duration(seconds: 3),
+    );
+    _dialogConfettiController = ConfettiController(
+      duration: const Duration(seconds: 1),
+    );
+
     _initializeGame();
     _startMascotAnimation();
     _bgMusicPlayer = AudioPlayer();
@@ -84,15 +97,16 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
     _mascotTimer?.cancel();
     _bgMusicPlayer.dispose();
     _poofController.dispose();
+    _confettiController.dispose();
+    _dialogConfettiController.dispose();
     super.dispose();
   }
 
   void _startMascotAnimation() {
-    // Cycle frog images every 1 second (same as card game)
     _mascotTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) {
         setState(() {
-          _frogFrame = (_frogFrame + 1) % 3; // 0 → 1 → 2 → 0
+          _frogFrame = (_frogFrame + 1) % 3;
         });
       }
     });
@@ -108,6 +122,8 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
       currentFruit = null;
       isDragging = false;
     });
+    _confettiController.stop();
+    _dialogConfettiController.stop();
   }
 
   Future<void> _playBackgroundMusic() async {
@@ -146,13 +162,11 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
 
     setState(() {
       currentFruit = random.nextBool() ? FruitType.cherry : FruitType.blueberry;
-      // Fixed position at the mascot location (left side)
-      fruitPosition = const Offset(0.31, 0.6); // Fixed position near the frog
+      fruitPosition = const Offset(0.31, 0.6);
       isDragging = false;
       showPoof = true;
     });
 
-    // Trigger poof animation
     _poofController.forward();
   }
 
@@ -236,71 +250,226 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
     );
   }
 
+  // --- BACK NAVIGATION LOGIC ---
+  Future<void> _onBackButtonPressed() async {
+    _timer?.cancel(); // Pause timer
+
+    bool? shouldExit = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _buildDialogContent(
+        title: '🚪 Leaving already?',
+        content: const Text(
+          'Your current game progress will be lost!',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 20),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context, false); // Stay
+              if (gameActive) {
+                // Restart timer if game was active, rough fix since we lost exact seconds tick
+                _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+                  setState(() {
+                    if (timeLeft > 0)
+                      timeLeft--;
+                    else {
+                      gameActive = false;
+                      timer.cancel();
+                      _showGameOver();
+                    }
+                  });
+                });
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text('Stay & Play'),
+          ),
+          const SizedBox(width: 10),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context, true); // Leave
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text('Exit Game'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldExit == true && mounted) {
+      Navigator.of(context).pop();
+    }
+  }
+
+  // --- CUSTOM DIALOG BUILDER ---
+  Widget _buildDialogContent({
+    required String title,
+    required Widget content,
+    required List<Widget> actions,
+    bool showConfetti = false,
+  }) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      child: Stack(
+        alignment: Alignment.topCenter,
+        children: [
+          Container(
+            width: 350,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.green.shade800, width: 4),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 15,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                content,
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: actions,
+                ),
+              ],
+            ),
+          ),
+          if (showConfetti)
+            ConfettiWidget(
+              confettiController: _dialogConfettiController,
+              blastDirection: pi / 2,
+              maxBlastForce: 20,
+              minBlastForce: 10,
+              emissionFrequency: 0.2,
+              numberOfParticles: 15,
+              gravity: 0.5,
+              shouldLoop: false,
+              colors: const [
+                Colors.yellow,
+                Colors.lightGreen,
+                Colors.lightBlue,
+              ],
+              createParticlePath: _drawStar,
+            ),
+        ],
+      ),
+    );
+  }
+
   void _showGameOver() {
+    if (totalScore > 0) {
+      _confettiController.play();
+      _dialogConfettiController.play();
+    }
+
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) {
-        return ThemedGameDialog(
-          title: 'GAME OVER! 🎉',
-          titleColor: totalScore > 0
-              ? Colors.yellow.shade300
-              : Colors.red.shade300,
-          mascotImagePath: totalScore > 0
-              ? 'assets/images/eyes_no_pad.png'
-              : 'assets/images/close_no_pad.png',
+        return _buildDialogContent(
+          title: 'WELL DONE! 🎉',
+          showConfetti: totalScore > 0,
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                totalScore > 0
-                    ? 'Great job collecting fruits!'
-                    : 'Time ran out! Try again!',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.green.shade50,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 20),
-              Text(
-                'Final Score: $totalScore',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.amber.shade300,
-                ),
-              ),
-              const SizedBox(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  _buildResultColumn("🍒", cherryCount),
-                  _buildResultColumn("🫐", blueberryCount),
+                  Column(
+                    children: [
+                      const Text('🍒', style: TextStyle(fontSize: 32)),
+                      const SizedBox(height: 8),
+                      Text(
+                        '$cherryCount',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Column(
+                    children: [
+                      const Text('🫐', style: TextStyle(fontSize: 32)),
+                      const SizedBox(height: 8),
+                      Text(
+                        '$blueberryCount',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ],
           ),
           actions: [
-            _buildThemedButton(
-              context,
-              text: 'Play Again',
+            ElevatedButton(
               onPressed: () {
                 Navigator.of(context).pop();
                 _initializeGame();
                 _startGame();
               },
-              color: Colors.green.shade600,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: const Text('Play Again'),
             ),
-            _buildThemedButton(
-              context,
-              text: 'Back to Menu',
+            const SizedBox(width: 8),
+            ElevatedButton(
               onPressed: () {
                 Navigator.of(context).pop();
                 Navigator.of(context).pop();
               },
-              color: Colors.brown.shade700,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: const Text('Back to Menu'),
             ),
           ],
         );
@@ -312,9 +481,9 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.2),
+        color: Colors.grey.shade100,
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.white.withOpacity(0.3), width: 2),
+        border: Border.all(color: Colors.grey.shade300, width: 2),
       ),
       child: Column(
         children: [
@@ -325,7 +494,7 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
             style: const TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: Colors.black87,
             ),
           ),
         ],
@@ -333,34 +502,28 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildThemedButton(
-    BuildContext context, {
-    required String text,
-    required VoidCallback onPressed,
-    Color color = Colors.green,
-  }) {
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 5.0),
-        child: ElevatedButton(
-          onPressed: onPressed,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: color,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15),
-              side: BorderSide(color: Colors.yellow.shade200, width: 3),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 15),
-            elevation: 8,
-          ),
-          child: Text(
-            text,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-          ),
-        ),
-      ),
-    );
+  // Helper for star confetti
+  Path _drawStar(Size size) {
+    double cx = size.width / 2;
+    double cy = size.height / 2;
+    double outerRadius = size.width / 2;
+    double innerRadius = size.width / 5;
+    Path path = Path();
+    double rot = pi / 2 * 3;
+    double step = pi / 5;
+    path.moveTo(cx, cy - outerRadius);
+    for (int i = 0; i < 5; i++) {
+      double x = cx + cos(rot) * outerRadius;
+      double y = cy + sin(rot) * outerRadius;
+      path.lineTo(x, y);
+      rot += step;
+      x = cx + cos(rot) * innerRadius;
+      y = cy + sin(rot) * innerRadius;
+      path.lineTo(x, y);
+      rot += step;
+    }
+    path.close();
+    return path;
   }
 
   @override
@@ -377,210 +540,400 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
     final headerHeight = isTablet ? 100.0 : 80.0;
     final fontSize = isTablet ? 20.0 : 12.0;
 
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage('assets/images/picnic_new.png'),
-            fit: BoxFit.cover,
-          ),
-        ),
-        child: Container(
-          color: const Color.fromARGB(255, 130, 138, 115).withOpacity(0.4),
-          child: SafeArea(
-            left: false,
-            bottom: false,
-            child: Stack(
-              children: [
-                // Header with score, timer, and counters in one row
-                Positioned(
-                  top: 0.03,
-                  left: 20,
-                  right: 20,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _onBackButtonPressed();
+      },
+      child: Scaffold(
+        body: Stack(
+          children: [
+            Container(
+              decoration: const BoxDecoration(
+                image: DecorationImage(
+                  image: AssetImage('assets/images/picnic_new.png'),
+                  fit: BoxFit.cover,
+                ),
+              ),
+              child: Container(
+                color: const Color.fromARGB(
+                  255,
+                  130,
+                  138,
+                  115,
+                ).withOpacity(0.4),
+                child: SafeArea(
+                  left: false,
+                  bottom: false,
+                  child: Stack(
                     children: [
-                      _buildScoreDisplay(fontSize),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          _buildModernCounter("🍒", cherryCount, fontSize),
-                          const SizedBox(width: 8),
-                          _buildModernCounter("🫐", blueberryCount, fontSize),
-                        ],
-                      ),
-                      _buildTimerDisplay(fontSize),
-                    ],
-                  ),
-                ),
-
-                // Frog mascot with animation
-                Positioned(
-                  left: isTablet ? 40 : 20,
-                  bottom: isTablet ? 20 : 17,
-                  child: Image.asset(
-                    _frogFrame == 0
-                        ? 'assets/images/open_no_pad.png'
-                        : _frogFrame == 1
-                        ? 'assets/images/close_no_pad.png'
-                        : 'assets/images/eyes_no_pad.png',
-                    width: frogSize,
-                    height: frogSize,
-                    fit: BoxFit.contain,
-                  ),
-                ),
-
-                // Cherry basket
-                Positioned(
-                  left: screenWidth * 0.35,
-                  bottom: isTablet ? 15 : 5,
-                  child: _buildBasket(
-                    key: cherryBasketKey,
-                    image: 'assets/images/cherrybasket.png',
-                    size: basketSize,
-                  ),
-                ),
-
-                // Blueberry basket
-                Positioned(
-                  right: screenWidth * 0.11,
-                  bottom: isTablet ? 15 : 5,
-                  child: _buildBasket(
-                    key: blueberryBasketKey,
-                    image: 'assets/images/blueberrybasket.png',
-                    size: basketSize,
-                  ),
-                ),
-
-                // Poof animation
-                if (showPoof && currentFruit != null)
-                  Positioned(
-                    left: fruitPosition.dx * _getGameAreaSize().width - 75,
-                    top:
-                        fruitPosition.dy * _getGameAreaSize().height -
-                        75 +
-                        headerHeight,
-                    child: AnimatedBuilder(
-                      animation: _poofController,
-                      builder: (context, child) {
-                        return Opacity(
-                          opacity: _poofOpacity.value,
-                          child: Transform.scale(
-                            scale: _poofScale.value,
-                            child: Container(
-                              width: 150,
-                              height: 150,
-                              child: CustomPaint(
-                                painter: PoofPainter(
-                                  color: _getFruitGlowColor(),
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-
-                // Draggable fruit
-                if (currentFruit != null)
-                  Positioned(
-                    left:
-                        fruitPosition.dx * _getGameAreaSize().width -
-                        (isDragging ? draggingFruitSize : baseFruitSize) / 2,
-                    top:
-                        fruitPosition.dy * _getGameAreaSize().height -
-                        (isDragging ? draggingFruitSize : baseFruitSize) / 2 +
-                        headerHeight,
-                    child: GestureDetector(
-                      onPanStart: _onDragStart,
-                      onPanUpdate: _onDragUpdate,
-                      onPanEnd: _onDragEnd,
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        width: isDragging ? draggingFruitSize : baseFruitSize,
-                        height: isDragging ? draggingFruitSize : baseFruitSize,
-                        child: Stack(
-                          alignment: Alignment.center,
+                      // HEADER ROW (Score, Counters, Timer, EXIT BUTTON)
+                      Positioned(
+                        top: 0.03,
+                        left: 20,
+                        right: 20,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            if (isDragging)
-                              Container(
-                                width: isDragging
-                                    ? draggingFruitSize * 1.1
-                                    : baseFruitSize,
-                                height: isDragging
-                                    ? draggingFruitSize * 1.1
-                                    : baseFruitSize,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: _getFruitGlowColor().withOpacity(
-                                        0.4,
-                                      ),
-                                      blurRadius: 15,
-                                      spreadRadius: 2,
-                                    ),
-                                  ],
+                            _buildScoreDisplay(fontSize),
+                            // Counters
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                _buildModernCounter(
+                                  "🍒",
+                                  cherryCount,
+                                  fontSize,
                                 ),
-                              ),
-                            Container(
-                              decoration: BoxDecoration(
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.2),
-                                    blurRadius: 8,
-                                    offset: const Offset(2, 2),
+                                const SizedBox(width: 8),
+                                _buildModernCounter(
+                                  "🫐",
+                                  blueberryCount,
+                                  fontSize,
+                                ),
+                              ],
+                            ),
+                            // Timer and Exit Button Group
+                            Row(
+                              children: [
+                                _buildTimerDisplay(fontSize),
+                                const SizedBox(width: 8),
+                                // NEW EXIT BUTTON
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.9),
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.2),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              ),
-                              child: Image.asset(
-                                currentFruit == FruitType.cherry
-                                    ? 'assets/images/cherry.png'
-                                    : 'assets/images/blueberry.png',
-                                width: isDragging
-                                    ? draggingFruitSize
-                                    : baseFruitSize,
-                                height: isDragging
-                                    ? draggingFruitSize
-                                    : baseFruitSize,
-                                fit: BoxFit.contain,
-                              ),
+                                  child: GestureDetector(
+                                    onTap: _onBackButtonPressed,
+                                    child: const Icon(
+                                      Icons.exit_to_app_rounded,
+                                      color: Colors.red,
+                                      size: 24,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
                       ),
-                    ),
-                  ),
 
-                // Start button
-                if (!gameActive && currentFruit == null)
-                  Center(
-                    child: ElevatedButton(
-                      onPressed: _startGame,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF4CAF50),
-                        padding: EdgeInsets.symmetric(
-                          horizontal: isTablet ? 15 : 5,
-                          vertical: isTablet ? 5 : 1,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      child: Text(
-                        'START GAME',
-                        style: TextStyle(
-                          fontSize: isTablet ? 10 : 5,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                      // Frog mascot
+                      Positioned(
+                        left: isTablet ? 40 : 20,
+                        bottom: isTablet ? 20 : 17,
+                        child: Image.asset(
+                          _frogFrame == 0
+                              ? 'assets/images/open_no_pad.png'
+                              : _frogFrame == 1
+                              ? 'assets/images/close_no_pad.png'
+                              : 'assets/images/eyes_no_pad.png',
+                          width: frogSize,
+                          height: frogSize,
+                          fit: BoxFit.contain,
                         ),
                       ),
-                    ),
+
+                      // Cherry basket
+                      Positioned(
+                        left: screenWidth * 0.35,
+                        bottom: isTablet ? 15 : 5,
+                        child: _buildBasket(
+                          key: cherryBasketKey,
+                          image: 'assets/images/cherrybasket.png',
+                          size: basketSize,
+                        ),
+                      ),
+
+                      // Blueberry basket
+                      Positioned(
+                        right: screenWidth * 0.11,
+                        bottom: isTablet ? 15 : 5,
+                        child: _buildBasket(
+                          key: blueberryBasketKey,
+                          image: 'assets/images/blueberrybasket.png',
+                          size: basketSize,
+                        ),
+                      ),
+
+                      // Poof animation
+                      if (showPoof && currentFruit != null)
+                        Positioned(
+                          left:
+                              fruitPosition.dx * _getGameAreaSize().width - 75,
+                          top:
+                              fruitPosition.dy * _getGameAreaSize().height -
+                              75 +
+                              headerHeight,
+                          child: AnimatedBuilder(
+                            animation: _poofController,
+                            builder: (context, child) {
+                              return Opacity(
+                                opacity: _poofOpacity.value,
+                                child: Transform.scale(
+                                  scale: _poofScale.value,
+                                  child: Container(
+                                    width: 150,
+                                    height: 150,
+                                    child: CustomPaint(
+                                      painter: PoofPainter(
+                                        color: _getFruitGlowColor(),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+
+                      // Draggable fruit
+                      if (currentFruit != null)
+                        Positioned(
+                          left:
+                              fruitPosition.dx * _getGameAreaSize().width -
+                              (isDragging ? draggingFruitSize : baseFruitSize) /
+                                  2,
+                          top:
+                              fruitPosition.dy * _getGameAreaSize().height -
+                              (isDragging ? draggingFruitSize : baseFruitSize) /
+                                  2 +
+                              headerHeight,
+                          child: GestureDetector(
+                            onPanStart: _onDragStart,
+                            onPanUpdate: _onDragUpdate,
+                            onPanEnd: _onDragEnd,
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              width: isDragging
+                                  ? draggingFruitSize
+                                  : baseFruitSize,
+                              height: isDragging
+                                  ? draggingFruitSize
+                                  : baseFruitSize,
+                              child: Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  if (isDragging)
+                                    Container(
+                                      width: isDragging
+                                          ? draggingFruitSize * 1.1
+                                          : baseFruitSize,
+                                      height: isDragging
+                                          ? draggingFruitSize * 1.1
+                                          : baseFruitSize,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: _getFruitGlowColor()
+                                                .withOpacity(0.4),
+                                            blurRadius: 15,
+                                            spreadRadius: 2,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.2),
+                                          blurRadius: 8,
+                                          offset: const Offset(2, 2),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Image.asset(
+                                      currentFruit == FruitType.cherry
+                                          ? 'assets/images/cherry.png'
+                                          : 'assets/images/blueberry.png',
+                                      width: isDragging
+                                          ? draggingFruitSize
+                                          : baseFruitSize,
+                                      height: isDragging
+                                          ? draggingFruitSize
+                                          : baseFruitSize,
+                                      fit: BoxFit.contain,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+
+                      // Start button
+                      if (!gameActive && currentFruit == null)
+                        Center(
+                          child: ElevatedButton(
+                            onPressed: _startGame,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF4CAF50),
+                              padding: EdgeInsets.symmetric(
+                                horizontal: isTablet ? 30 : 20,
+                                vertical: isTablet ? 15 : 10,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            child: Text(
+                              'START GAME',
+                              style: TextStyle(
+                                fontSize: isTablet ? 24 : 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-              ],
+                ),
+              ),
             ),
-          ),
+
+            // --- CONFETTI CANNONS (7 Sources) ---
+
+            // 1. Top Center
+            Align(
+              alignment: Alignment.topCenter,
+              child: ConfettiWidget(
+                confettiController: _confettiController,
+                blastDirection: pi / 2,
+                maxBlastForce: 10,
+                minBlastForce: 5,
+                emissionFrequency: 0.08,
+                numberOfParticles: 30,
+                gravity: 0.2,
+                colors: const [
+                  Colors.green,
+                  Colors.blue,
+                  Colors.pink,
+                  Colors.orange,
+                  Colors.purple,
+                  Colors.amber,
+                  Colors.red,
+                ],
+                createParticlePath: _drawStar,
+              ),
+            ),
+            // 2. Top Left
+            Align(
+              alignment: Alignment.topLeft,
+              child: ConfettiWidget(
+                confettiController: _confettiController,
+                blastDirection: pi / 3,
+                maxBlastForce: 10,
+                minBlastForce: 5,
+                emissionFrequency: 0.1,
+                numberOfParticles: 25,
+                gravity: 0.2,
+                colors: const [
+                  Colors.green,
+                  Colors.blue,
+                  Colors.pink,
+                  Colors.orange,
+                ],
+                createParticlePath: _drawStar,
+              ),
+            ),
+            // 3. Top Right
+            Align(
+              alignment: Alignment.topRight,
+              child: ConfettiWidget(
+                confettiController: _confettiController,
+                blastDirection: 2 * pi / 3,
+                maxBlastForce: 10,
+                minBlastForce: 5,
+                emissionFrequency: 0.1,
+                numberOfParticles: 25,
+                gravity: 0.2,
+                colors: const [
+                  Colors.purple,
+                  Colors.amber,
+                  Colors.red,
+                  Colors.cyan,
+                ],
+                createParticlePath: _drawStar,
+              ),
+            ),
+            // 4. Center Left
+            Align(
+              alignment: Alignment.centerLeft,
+              child: ConfettiWidget(
+                confettiController: _confettiController,
+                blastDirection: 0,
+                maxBlastForce: 15,
+                minBlastForce: 5,
+                emissionFrequency: 0.08,
+                numberOfParticles: 20,
+                gravity: 0.4,
+                colors: const [Colors.yellow, Colors.orange, Colors.red],
+                createParticlePath: _drawStar,
+              ),
+            ),
+            // 5. Center Right
+            Align(
+              alignment: Alignment.centerRight,
+              child: ConfettiWidget(
+                confettiController: _confettiController,
+                blastDirection: pi,
+                maxBlastForce: 15,
+                minBlastForce: 5,
+                emissionFrequency: 0.08,
+                numberOfParticles: 20,
+                gravity: 0.4,
+                colors: const [Colors.blue, Colors.cyan, Colors.purple],
+                createParticlePath: _drawStar,
+              ),
+            ),
+            // 6. Bottom Left
+            Align(
+              alignment: Alignment.bottomLeft,
+              child: ConfettiWidget(
+                confettiController: _confettiController,
+                blastDirection: -pi / 4,
+                maxBlastForce: 10,
+                minBlastForce: 5,
+                emissionFrequency: 0.08,
+                numberOfParticles: 15,
+                gravity: 0.3,
+                colors: const [Colors.teal, Colors.lime, Colors.indigo],
+                createParticlePath: _drawStar,
+              ),
+            ),
+            // 7. Bottom Right
+            Align(
+              alignment: Alignment.bottomRight,
+              child: ConfettiWidget(
+                confettiController: _confettiController,
+                blastDirection: -3 * pi / 4,
+                maxBlastForce: 10,
+                minBlastForce: 5,
+                emissionFrequency: 0.08,
+                numberOfParticles: 15,
+                gravity: 0.3,
+                colors: const [
+                  Colors.pinkAccent,
+                  Colors.deepOrange,
+                  Colors.lightBlueAccent,
+                ],
+                createParticlePath: _drawStar,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -729,8 +1082,10 @@ class PoofPainter extends CustomPainter {
       canvas.drawCircle(offset, radius, paint);
     }
 
+    // Draw center circle
     canvas.drawCircle(center, size.width * 0.2, paint);
 
+    // Draw sparkles
     final sparklePaint = Paint()
       ..color = Colors.white.withOpacity(0.8)
       ..style = PaintingStyle.fill;
@@ -768,131 +1123,3 @@ class PoofPainter extends CustomPainter {
 }
 
 enum FruitType { cherry, blueberry }
-
-// --- Themed Game Dialog Widget (Same as CardGame) ---
-class ThemedGameDialog extends StatelessWidget {
-  final String title;
-  final Widget content;
-  final List<Widget> actions;
-  final Color titleColor;
-  final String mascotImagePath;
-
-  const ThemedGameDialog({
-    super.key,
-    required this.title,
-    required this.content,
-    required this.actions,
-    this.titleColor = Colors.white,
-    this.mascotImagePath = 'assets/images/open_no_pad.png',
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
-
-    final dialogWidth = screenWidth * 0.8;
-    final dialogHeight = screenHeight * 0.85;
-
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: dialogWidth,
-          maxHeight: dialogHeight,
-        ),
-        child: Stack(
-          alignment: Alignment.topCenter,
-          children: [
-            // Main Content Box
-            Container(
-              margin: const EdgeInsets.only(top: 50),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.brown.shade800, Colors.green.shade900],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-                borderRadius: BorderRadius.circular(25),
-                border: Border.all(color: Colors.brown.shade600, width: 8),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.6),
-                    blurRadius: 15,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
-              ),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(25, 75, 25, 25),
-                child: Column(
-                  mainAxisSize: MainAxisSize.max,
-                  children: [
-                    Flexible(child: SingleChildScrollView(child: content)),
-                    const SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: actions,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // Title Header/Banner
-            Positioned(
-              top: 0,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 12,
-                  horizontal: 30,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.green.shade700,
-                  borderRadius: BorderRadius.circular(50),
-                  border: Border.all(color: Colors.yellow.shade700, width: 4),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.5),
-                      blurRadius: 8,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
-                ),
-                child: Text(
-                  title,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w900,
-                    color: titleColor,
-                    shadows: const [
-                      Shadow(
-                        offset: Offset(2, 2),
-                        blurRadius: 2.0,
-                        color: Colors.black,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            // Mascot Image
-            Positioned(
-              top: 35,
-              right: 15,
-              child: Image.asset(
-                mascotImagePath,
-                width: 70,
-                height: 70,
-                fit: BoxFit.contain,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

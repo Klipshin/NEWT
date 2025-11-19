@@ -1,6 +1,9 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:confetti/confetti.dart';
+import 'package:flip_card/flip_card.dart'; // Import the package
 
 class CardGame extends StatefulWidget {
   const CardGame({super.key});
@@ -15,14 +18,19 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
   bool canFlip = true;
   int matches = 0;
   int setsCompleted = 0;
-  int timeRemaining = 30; // Start with 30 seconds
+  int timeRemaining = 30;
   Timer? _gameTimer;
-  late AnimationController _flipController;
+
+  // Removed _flipController (handled by package)
   late AnimationController _matchController;
   late AudioPlayer _bgMusicPlayer;
-  bool _isMuted = false;
 
-  int _frogFrame = 0; // 0 = eyeopen, 1 = close, 2 = mouth
+  // Master confetti controller for background effects
+  late ConfettiController _confettiController;
+  // Specific controller for confetti that originates from the dialog itself
+  late ConfettiController _dialogConfettiController;
+
+  int _frogFrame = 0;
   Timer? _mascotTimer;
 
   final List<String> cardImages = [
@@ -40,13 +48,18 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    _flipController = AnimationController(
-      duration: const Duration(milliseconds: 600),
-      vsync: this,
-    );
+
     _matchController = AnimationController(
       duration: const Duration(milliseconds: 1000),
       vsync: this,
+    );
+
+    _confettiController = ConfettiController(
+      duration: const Duration(seconds: 3),
+    );
+    // Initialize dialog confetti controller as well
+    _dialogConfettiController = ConfettiController(
+      duration: const Duration(seconds: 1),
     );
 
     _initializeGame();
@@ -58,20 +71,20 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
 
   @override
   void dispose() {
-    _flipController.dispose();
     _matchController.dispose();
     _mascotTimer?.cancel();
     _gameTimer?.cancel();
     _bgMusicPlayer.dispose();
+    _confettiController.dispose();
+    _dialogConfettiController.dispose(); // Dispose dialog controller
     super.dispose();
   }
 
   void _startMascotAnimation() {
-    // Cycle frog images every 1 second
     _mascotTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) {
         setState(() {
-          _frogFrame = (_frogFrame + 1) % 3; // 0 → 1 → 2 → 0
+          _frogFrame = (_frogFrame + 1) % 3;
         });
       }
     });
@@ -85,6 +98,9 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
     canFlip = true;
     timeRemaining = 30;
 
+    _confettiController.stop();
+    _dialogConfettiController.stop(); // Stop dialog confetti on restart
+
     _gameTimer?.cancel();
     _startGameTimer();
 
@@ -95,25 +111,20 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
     cards.clear();
 
     if (setsCompleted < 3) {
-      // 3x3 grid with one unpaired card
       List<String> gameImages = [...cardImages, ...cardImages];
-      gameImages.add('assets/images/pad.png'); // 9th unpaired card
+      gameImages.add('assets/images/pad.png');
       gameImages.shuffle();
-
       for (int i = 0; i < 9; i++) {
         cards.add(GameCard(id: i, imagePath: gameImages[i]));
       }
     } else {
-      // 4x3 grid (12 cards) - all paired, no unpaired card
       List<String> allImages = [...cardImages, ...extraCardImages];
       List<String> gameImages = [...allImages, ...allImages];
       gameImages.shuffle();
-
       for (int i = 0; i < 12; i++) {
         cards.add(GameCard(id: i, imagePath: gameImages[i]));
       }
     }
-
     setState(() {});
   }
 
@@ -145,6 +156,9 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
       return;
     }
 
+    // Trigger the package animation using the key
+    cards[index].cardKey.currentState?.toggleCard();
+
     setState(() {
       cards[index].isFlipped = true;
       flippedCards.add(index);
@@ -166,7 +180,7 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
           cards[flippedCards[0]].isMatched = true;
           cards[flippedCards[1]].isMatched = true;
           matches++;
-          timeRemaining += 5; // Add 5 seconds for each match
+          timeRemaining += 5;
         });
 
         _matchController.forward().then((_) => _matchController.reset());
@@ -176,6 +190,10 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
           _onSetCompleted();
         }
       } else {
+        // No match: Flip them back using the keys
+        cards[flippedCards[0]].cardKey.currentState?.toggleCard();
+        cards[flippedCards[1]].cardKey.currentState?.toggleCard();
+
         setState(() {
           cards[flippedCards[0]].isFlipped = false;
           cards[flippedCards[1]].isFlipped = false;
@@ -189,110 +207,233 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
 
   void _onSetCompleted() {
     setsCompleted++;
-
     if (setsCompleted == 3) {
-      // Completed 3 sets of 3x3, now move to 4x3
       _gameTimer?.cancel();
       _showLevelUpDialog();
     } else {
-      // Continue with another 3x3 set
       _gameTimer?.cancel();
       _showNextSetDialog();
     }
   }
 
+  Future<void> _onBackButtonPressed() async {
+    _gameTimer?.cancel();
+
+    bool? shouldExit = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _buildDialogContent(
+        '🚪 Leaving already?',
+        'Your current game progress will be lost!',
+        [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context, false);
+              _startGameTimer();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text('Stay & Play', style: TextStyle(fontSize: 16)),
+          ),
+          const SizedBox(width: 20),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context, true);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text('Exit Game', style: TextStyle(fontSize: 16)),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldExit == true && mounted) {
+      Navigator.of(context).pop();
+    }
+  }
+
+  // --- DIALOG BUILDER WITH INTERNAL CONFETTI ---
+  Widget _buildDialogContent(
+    String title,
+    String message,
+    List<Widget> actions,
+  ) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      child: Stack(
+        // Use Stack to layer confetti over the dialog
+        alignment: Alignment.topCenter, // Confetti from the top of the dialog
+        children: [
+          Container(
+            width: 500,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.green.shade800, width: 4),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 15,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 20),
+                ),
+                const SizedBox(height: 30),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: actions,
+                ),
+              ],
+            ),
+          ),
+          // Confetti for the dialog itself
+          ConfettiWidget(
+            confettiController: _dialogConfettiController,
+            blastDirection: pi / 2, // Downwards
+            maxBlastForce: 20, // Stronger blast for a pop
+            minBlastForce: 10,
+            emissionFrequency: 0.2, // Frequent bursts
+            numberOfParticles: 15, // A good amount
+            gravity: 0.5, // Fall a bit faster
+            shouldLoop: false,
+            colors: const [
+              Colors.yellow,
+              Colors.lightGreen,
+              Colors.lightBlue,
+            ], // Brighter colors for dialog
+            createParticlePath: drawStar,
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showNextSetDialog() {
+    _confettiController.play();
+    _dialogConfettiController.play(); // Play dialog confetti
     _gameTimer?.cancel();
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) {
-        return ThemedGameDialog(
-          title: 'ALL PAIRED UP! 🌟',
-          titleColor: Colors.cyan.shade300, // A new celebratory color
-          mascotImagePath:
-              'assets/images/mouthfrog.png', // Assuming a happy frog image
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'You found every creature pair! Get ready for a bigger swamp challenge.',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.cyan.shade50,
-                ),
-                textAlign: TextAlign.center,
+      builder: (_) => _buildDialogContent(
+        '🎉 Good Job!',
+        'You found all the pairs! Ready for the next round?',
+        [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
-            ],
+            ),
+            child: const Text('Back to Menu', style: TextStyle(fontSize: 16)),
           ),
-          actions: [
-            _buildThemedButton(
-              context,
-              text: 'Start Next Round!',
-              onPressed: () {
-                Navigator.of(context).pop();
-                matches = 0;
-                _setupCards(); // Setup the next, larger card grid
-                _startGameTimer();
-              },
-              color: Colors.green.shade700,
+          const SizedBox(width: 20),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              matches = 0;
+              _setupCards();
+              _startGameTimer();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
-            _buildThemedButton(
-              context,
-              text: 'Go to Menu',
-              onPressed: () {
-                Navigator.of(context).pop();
-                // Navigate back to the previous screen (menu)
-                Navigator.of(context).pop();
-              },
-              color: Colors.brown.shade700,
+            child: const Text(
+              'Start Next Round',
+              style: TextStyle(fontSize: 16),
             ),
-          ],
-        );
-      },
+          ),
+        ],
+      ),
     );
   }
 
   void _showLevelUpDialog() {
+    _confettiController.play();
+    _dialogConfettiController.play(); // Play dialog confetti
     _gameTimer?.cancel();
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) {
-        return ThemedGameDialog(
-          title: 'LEVEL COMPLETE! 🎉',
-          titleColor: Colors.yellow.shade300,
-          mascotImagePath: 'assets/images/mouthfrog.png',
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Great job! The swamp gets bigger now.',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.green.shade50,
-                ),
-                textAlign: TextAlign.center,
+      builder: (_) => _buildDialogContent(
+        '🎉 Level Complete!',
+        'Great work! The swamp is getting bigger now.',
+        [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
-            ],
-          ),
-          actions: [
-            _buildThemedButton(
-              context,
-              text: 'Play Next Level!',
-              onPressed: () {
-                Navigator.of(context).pop();
-                matches = 0;
-                _setupCards();
-                _startGameTimer();
-              },
-              color: Colors.orange.shade700,
             ),
-          ],
-        );
-      },
+            child: const Text('Back to Menu', style: TextStyle(fontSize: 16)),
+          ),
+          const SizedBox(width: 20),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              matches = 0;
+              _setupCards();
+              _startGameTimer();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text(
+              'Play Next Level',
+              style: TextStyle(fontSize: 16),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -301,273 +442,386 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) {
-        return ThemedGameDialog(
-          title: 'GAME OVER 😔',
-          titleColor: Colors.red.shade300,
-          mascotImagePath: 'assets/images/closefrog.png',
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Time ran out! Try again!',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.red.shade200,
-                ),
-                textAlign: TextAlign.center,
+      builder: (_) => _buildDialogContent(
+        '⏳ Time\'s Up!',
+        'You ran out of time. Don\'t give up!',
+        [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
-            ],
+            ),
+            child: const Text('Back to Menu', style: TextStyle(fontSize: 16)),
           ),
-          actions: [
-            _buildThemedButton(
-              context,
-              text: 'Play Again',
-              onPressed: () {
-                Navigator.of(context).pop();
-                _initializeGame();
-              },
-              color: Colors.green.shade600,
+          const SizedBox(width: 20),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _initializeGame();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
-            _buildThemedButton(
-              context,
-              text: 'Back to Menu',
-              onPressed: () {
-                Navigator.of(context).pop();
-                // Navigate back to the previous screen (menu)
-                Navigator.of(context).pop();
-              },
-              color: Colors.brown.shade700,
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  // Helper widget for a thematic button style (inside _CardGameState)
-  Widget _buildThemedButton(
-    BuildContext context, {
-    required String text,
-    required VoidCallback onPressed,
-    Color color = Colors.green,
-  }) {
-    return Expanded(
-      // Use Expanded to give buttons equal width
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 5.0),
-        child: ElevatedButton(
-          onPressed: onPressed,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: color,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15), // Bigger radius
-              side: BorderSide(
-                color: Colors.yellow.shade200,
-                width: 3,
-              ), // Stronger border
-            ),
-            padding: const EdgeInsets.symmetric(
-              horizontal: 10,
-              vertical: 15, // Taller button
-            ),
-            elevation: 8, // More prominent shadow
-          ),
-          child: Text(
-            text,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 18, // Bigger font size
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // Helper widget for stats in game over (inside _CardGameState)
-  Widget _buildStatRow(String label, String value, Color color) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        vertical: 2,
-      ), // REDUCED vertical padding (from 3)
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 16,
-              color: color,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.white,
-              fontWeight: FontWeight.w900,
-            ),
+            child: const Text('Play Again', style: TextStyle(fontSize: 16)),
           ),
         ],
       ),
     );
   }
 
+  Path drawStar(Size size) {
+    double cx = size.width / 2;
+    double cy = size.height / 2;
+    double outerRadius = size.width / 2;
+    double innerRadius = size.width / 5;
+
+    Path path = Path();
+    double rot = pi / 2 * 3;
+    double step = pi / 5;
+
+    path.moveTo(cx, cy - outerRadius);
+    for (int i = 0; i < 5; i++) {
+      double x = cx + cos(rot) * outerRadius;
+      double y = cy + sin(rot) * outerRadius;
+      path.lineTo(x, y);
+      rot += step;
+
+      x = cx + cos(rot) * innerRadius;
+      y = cy + sin(rot) * innerRadius;
+      path.lineTo(x, y);
+      rot += step;
+    }
+    path.close();
+    return path;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage("assets/images/swamp_new.png"),
-            fit: BoxFit.cover,
-          ),
-        ),
-        child: Container(
-          color: const Color.fromARGB(255, 112, 155, 131).withOpacity(0.4),
-          child: SafeArea(
-            child: Row(
-              children: [
-                // Left mascot area
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.all(20),
-                    child: Center(
-                      child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          return OverflowBox(
-                            maxWidth: double.infinity,
-                            maxHeight: double.infinity,
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 500),
-                              curve: Curves.easeInOut,
-                              transform: Matrix4.translationValues(
-                                setsCompleted >= 3
-                                    ? -3
-                                    : 50, // Move left when 12 cards
-                                20,
-                                0,
-                              ),
-                              child: Image.asset(
-                                _frogFrame == 0
-                                    ? 'assets/images/eyeopenfrog.png'
-                                    : _frogFrame == 1
-                                    ? 'assets/images/closefrog.png'
-                                    : 'assets/images/mouthfrog.png',
-                                width: constraints.maxWidth * 1.5,
-                                height: constraints.maxHeight * 1.5,
-                                fit: BoxFit.contain,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _onBackButtonPressed();
+      },
+      child: Scaffold(
+        body: Stack(
+          children: [
+            Container(
+              decoration: const BoxDecoration(
+                image: DecorationImage(
+                  image: AssetImage("assets/images/swamp_new.png"),
+                  fit: BoxFit.cover,
                 ),
-                // Game grid
-                Expanded(
-                  flex: 2,
-                  child: Container(
-                    margin: const EdgeInsets.all(8),
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        double spacing = 6;
-                        double maxWidth = constraints.maxWidth;
-                        double maxHeight = constraints.maxHeight;
-
-                        int crossAxisCount = setsCompleted < 3 ? 3 : 4;
-                        int rows = setsCompleted < 3 ? 3 : 3;
-
-                        double cardWidth =
-                            (maxWidth - (spacing * (crossAxisCount - 1))) /
-                            crossAxisCount;
-                        double cardHeight =
-                            (maxHeight - (spacing * (rows - 1))) / rows;
-                        double cardSize =
-                            (cardWidth < cardHeight ? cardWidth : cardHeight) *
-                            0.9;
-                        cardSize = cardSize.clamp(50, 120);
-
-                        double gridWidth =
-                            (cardSize * crossAxisCount) +
-                            (spacing * (crossAxisCount - 1));
-                        double gridHeight =
-                            (cardSize * rows) + (spacing * (rows - 1));
-
-                        return Center(
-                          child: SizedBox(
-                            width: gridWidth,
-                            height: gridHeight,
-                            child: GridView.builder(
-                              physics: const NeverScrollableScrollPhysics(),
-                              gridDelegate:
-                                  SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: crossAxisCount,
-                                    crossAxisSpacing: spacing,
-                                    mainAxisSpacing: spacing,
+              ),
+              child: Container(
+                color: const Color.fromARGB(
+                  255,
+                  112,
+                  155,
+                  131,
+                ).withOpacity(0.4),
+                child: SafeArea(
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.all(20),
+                          child: Center(
+                            child: LayoutBuilder(
+                              builder: (context, constraints) {
+                                return OverflowBox(
+                                  maxWidth: double.infinity,
+                                  maxHeight: double.infinity,
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 500),
+                                    curve: Curves.easeInOut,
+                                    transform: Matrix4.translationValues(
+                                      setsCompleted >= 3 ? -3 : 50,
+                                      20,
+                                      0,
+                                    ),
+                                    child: Image.asset(
+                                      _frogFrame == 0
+                                          ? 'assets/images/eyeopenfrog.png'
+                                          : _frogFrame == 1
+                                          ? 'assets/images/closefrog.png'
+                                          : 'assets/images/mouthfrog.png',
+                                      width: constraints.maxWidth * 1.5,
+                                      height: constraints.maxHeight * 1.5,
+                                      fit: BoxFit.contain,
+                                    ),
                                   ),
-                              itemCount: cards.length,
-                              itemBuilder: (context, index) {
-                                return _buildGameCard(index, cardSize);
+                                );
                               },
                             ),
                           ),
-                        );
-                      },
-                    ),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 2,
+                        child: Container(
+                          margin: const EdgeInsets.all(8),
+                          child: LayoutBuilder(
+                            builder: (context, constraints) {
+                              double spacing = 6;
+                              double maxWidth = constraints.maxWidth;
+                              double maxHeight = constraints.maxHeight;
+
+                              int crossAxisCount = setsCompleted < 3 ? 3 : 4;
+                              int rows = setsCompleted < 3 ? 3 : 3;
+
+                              double cardWidth =
+                                  (maxWidth -
+                                      (spacing * (crossAxisCount - 1))) /
+                                  crossAxisCount;
+                              double cardHeight =
+                                  (maxHeight - (spacing * (rows - 1))) / rows;
+                              double cardSize =
+                                  (cardWidth < cardHeight
+                                      ? cardWidth
+                                      : cardHeight) *
+                                  0.9;
+                              cardSize = cardSize.clamp(50, 120);
+
+                              double gridWidth =
+                                  (cardSize * crossAxisCount) +
+                                  (spacing * (crossAxisCount - 1));
+                              double gridHeight =
+                                  (cardSize * rows) + (spacing * (rows - 1));
+
+                              return Center(
+                                child: SizedBox(
+                                  width: gridWidth,
+                                  height: gridHeight,
+                                  child: GridView.builder(
+                                    physics:
+                                        const NeverScrollableScrollPhysics(),
+                                    gridDelegate:
+                                        SliverGridDelegateWithFixedCrossAxisCount(
+                                          crossAxisCount: crossAxisCount,
+                                          crossAxisSpacing: spacing,
+                                          mainAxisSpacing: spacing,
+                                        ),
+                                    itemCount: cards.length,
+                                    itemBuilder: (context, index) {
+                                      return _buildGameCard(index, cardSize);
+                                    },
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                      Container(
+                        width: 90,
+                        padding: const EdgeInsets.all(8),
+                        child: SingleChildScrollView(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              _buildSideStatItem(
+                                'Time',
+                                '$timeRemaining',
+                                Icons.timer,
+                              ),
+                              const SizedBox(height: 20),
+                              _buildSideStatItem(
+                                'Sets',
+                                '$setsCompleted/3',
+                                Icons.grid_4x4,
+                              ),
+                              const SizedBox(height: 20),
+                              _buildSideStatItem(
+                                'Matches',
+                                '$matches/${setsCompleted < 3 ? 4 : 6}',
+                                Icons.favorite,
+                              ),
+                              const SizedBox(height: 20),
+
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.9),
+                                  borderRadius: BorderRadius.circular(15),
+                                ),
+                                child: IconButton(
+                                  onPressed: _initializeGame,
+                                  icon: const Icon(Icons.refresh),
+                                  color: Colors.green.shade700,
+                                  tooltip: 'Reset Game',
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.9),
+                                  borderRadius: BorderRadius.circular(15),
+                                ),
+                                child: IconButton(
+                                  onPressed: _onBackButtonPressed,
+                                  icon: const Icon(Icons.exit_to_app_rounded),
+                                  color: Colors.red.shade700,
+                                  tooltip: 'Exit Game',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                // Right sidebar - FIXED WITH SINGLECHILDSCROLLVIEW
-                Container(
-                  width: 90,
-                  padding: const EdgeInsets.all(8),
-                  child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _buildSideStatItem(
-                          'Time',
-                          '$timeRemaining',
-                          Icons.timer,
-                        ),
-                        const SizedBox(height: 20),
-                        _buildSideStatItem(
-                          'Sets',
-                          '$setsCompleted/3',
-                          Icons.grid_4x4,
-                        ),
-                        const SizedBox(height: 20),
-                        _buildSideStatItem(
-                          'Matches',
-                          '$matches/${setsCompleted < 3 ? 4 : 6}',
-                          Icons.favorite,
-                        ),
-                        const SizedBox(height: 20),
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.9),
-                            borderRadius: BorderRadius.circular(15),
-                          ),
-                          child: IconButton(
-                            onPressed: _initializeGame,
-                            icon: const Icon(Icons.refresh),
-                            color: Colors.green.shade700,
-                            tooltip: 'Reset Game',
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
+
+            // --- ALL CONFETTI CANNONS (Background) ---
+
+            // 1. Top Center
+            Align(
+              alignment: Alignment.topCenter,
+              child: ConfettiWidget(
+                confettiController: _confettiController,
+                blastDirection: pi / 2,
+                maxBlastForce: 10,
+                minBlastForce: 5,
+                emissionFrequency: 0.08,
+                numberOfParticles: 30,
+                gravity: 0.2,
+                colors: const [
+                  Colors.green,
+                  Colors.blue,
+                  Colors.pink,
+                  Colors.orange,
+                  Colors.purple,
+                  Colors.amber,
+                  Colors.red,
+                ],
+                createParticlePath: drawStar,
+              ),
+            ),
+
+            // 2. Top Left
+            Align(
+              alignment: Alignment.topLeft,
+              child: ConfettiWidget(
+                confettiController: _confettiController,
+                blastDirection: pi / 3,
+                maxBlastForce: 10,
+                minBlastForce: 5,
+                emissionFrequency: 0.1, // Increased
+                numberOfParticles: 25, // Increased
+                gravity: 0.2,
+                colors: const [
+                  Colors.green,
+                  Colors.blue,
+                  Colors.pink,
+                  Colors.orange,
+                ],
+                createParticlePath: drawStar,
+              ),
+            ),
+
+            // 3. Top Right
+            Align(
+              alignment: Alignment.topRight,
+              child: ConfettiWidget(
+                confettiController: _confettiController,
+                blastDirection: 2 * pi / 3,
+                maxBlastForce: 10,
+                minBlastForce: 5,
+                emissionFrequency: 0.1, // Increased
+                numberOfParticles: 25, // Increased
+                gravity: 0.2,
+                colors: const [
+                  Colors.purple,
+                  Colors.amber,
+                  Colors.red,
+                  Colors.cyan,
+                ],
+                createParticlePath: drawStar,
+              ),
+            ),
+
+            // 4. Center Left (Shooting Right)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: ConfettiWidget(
+                confettiController: _confettiController,
+                blastDirection: 0,
+                maxBlastForce: 15,
+                minBlastForce: 5,
+                emissionFrequency: 0.08, // Increased
+                numberOfParticles: 20, // Increased
+                gravity: 0.4,
+                colors: const [Colors.yellow, Colors.orange, Colors.red],
+                createParticlePath: drawStar,
+              ),
+            ),
+
+            // 5. Center Right (Shooting Left)
+            Align(
+              alignment: Alignment.centerRight,
+              child: ConfettiWidget(
+                confettiController: _confettiController,
+                blastDirection: pi,
+                maxBlastForce: 15,
+                minBlastForce: 5,
+                emissionFrequency: 0.08, // Increased
+                numberOfParticles: 20, // Increased
+                gravity: 0.4,
+                colors: const [Colors.blue, Colors.cyan, Colors.purple],
+                createParticlePath: drawStar,
+              ),
+            ),
+
+            // 6. NEW: Bottom Left (Shooting Up)
+            Align(
+              alignment: Alignment.bottomLeft,
+              child: ConfettiWidget(
+                confettiController: _confettiController,
+                blastDirection: -pi / 4, // Up-Right diagonal
+                maxBlastForce: 10,
+                minBlastForce: 5,
+                emissionFrequency: 0.08,
+                numberOfParticles: 15,
+                gravity: 0.3,
+                colors: const [Colors.teal, Colors.lime, Colors.indigo],
+                createParticlePath: drawStar,
+              ),
+            ),
+
+            // 7. NEW: Bottom Right (Shooting Up)
+            Align(
+              alignment: Alignment.bottomRight,
+              child: ConfettiWidget(
+                confettiController: _confettiController,
+                blastDirection: -3 * pi / 4, // Up-Left diagonal
+                maxBlastForce: 10,
+                minBlastForce: 5,
+                emissionFrequency: 0.08,
+                numberOfParticles: 15,
+                gravity: 0.3,
+                colors: const [
+                  Colors.pinkAccent,
+                  Colors.deepOrange,
+                  Colors.lightBlueAccent,
+                ],
+                createParticlePath: drawStar,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -615,34 +869,19 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
 
   Widget _buildGameCard(int index, double cardSize) {
     final card = cards[index];
-
+    // Replaced Manual animation with FlipCard
     return GestureDetector(
       onTap: () => _flipCard(index),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        width: cardSize,
-        height: cardSize,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.2),
-              blurRadius: 3,
-              offset: const Offset(1, 1),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 300),
-            transitionBuilder: (child, animation) =>
-                RotationTransition(turns: animation, child: child),
-            child: card.isFlipped || card.isMatched
-                ? _buildCardFront(card, cardSize)
-                : _buildCardBack(cardSize),
-          ),
-        ),
+      child: FlipCard(
+        key: card.cardKey, // Use key for programmatic control
+        flipOnTouch: false, // We handle the flip via _flipCard
+        direction: FlipDirection.HORIZONTAL,
+        side: CardSide.FRONT,
+        front: _buildCardBack(cardSize), // "Front" is the Pad (hidden state)
+        back: _buildCardFront(
+          card,
+          cardSize,
+        ), // "Back" is the Animal (revealed state)
       ),
     );
   }
@@ -650,12 +889,22 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
   Widget _buildCardFront(GameCard card, double cardSize) {
     return Container(
       key: ValueKey('front-${card.id}'),
+      width: cardSize,
+      height: cardSize,
       decoration: BoxDecoration(
         color: card.isMatched ? Colors.green.shade300 : Colors.white,
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: card.isMatched ? Colors.green.shade600 : Colors.grey.shade300,
           width: 1,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 3,
+            offset: const Offset(1, 1),
+          ),
+        ],
       ),
       child: Center(
         child: AnimatedScale(
@@ -675,9 +924,19 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
   Widget _buildCardBack(double cardSize) {
     return Container(
       key: const ValueKey('back'),
+      width: cardSize,
+      height: cardSize,
       decoration: BoxDecoration(
         color: Colors.green.shade800,
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: Colors.green.shade900, width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 3,
+            offset: const Offset(1, 1),
+          ),
+        ],
       ),
       child: Center(
         child: Image.asset(
@@ -697,157 +956,13 @@ class GameCard {
   bool isFlipped;
   bool isMatched;
 
+  // Added key for flip control
+  final GlobalKey<FlipCardState> cardKey = GlobalKey<FlipCardState>();
+
   GameCard({
     required this.id,
     required this.imagePath,
     this.isFlipped = false,
     this.isMatched = false,
   });
-}
-
-// --- NEW/UPDATED Themed Game Dialog Widget (Big, Engaging, and Safe) ---
-class ThemedGameDialog extends StatelessWidget {
-  final String title;
-  final Widget content;
-  final List<Widget> actions;
-  final Color titleColor;
-  final String mascotImagePath;
-
-  const ThemedGameDialog({
-    super.key,
-    required this.title,
-    required this.content,
-    required this.actions,
-    this.titleColor = Colors.white,
-    this.mascotImagePath = 'assets/images/eyeopenfrog.png',
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
-
-    // Make the dialog very large, but responsive
-    final dialogWidth = screenWidth * 0.8;
-    final dialogHeight = screenHeight * 0.85;
-
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      // Use AlertDialog-like padding to make it truly a popup
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: dialogWidth,
-          maxHeight: dialogHeight,
-        ),
-        child: Stack(
-          alignment: Alignment.topCenter,
-          children: [
-            // 1. The Main Content Box (Wooden/Mossy Look)
-            Container(
-              margin: const EdgeInsets.only(
-                top: 50,
-              ), // Space for the title banner
-              decoration: BoxDecoration(
-                // Dark, swampy gradient for the body
-                gradient: LinearGradient(
-                  colors: [Colors.brown.shade800, Colors.green.shade900],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-                borderRadius: BorderRadius.circular(25), // More rounded corners
-                border: Border.all(
-                  color: Colors.brown.shade600,
-                  width: 8,
-                ), // Thicker, wooden border
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.6),
-                    blurRadius: 15, // Deeper shadow
-                    offset: const Offset(0, 10),
-                  ),
-                ],
-              ),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  25,
-                  75,
-                  25,
-                  25,
-                ), // More generous padding
-                child: Column(
-                  mainAxisSize: MainAxisSize
-                      .max, // Take max height allowed by ConstrainedBox
-                  children: [
-                    // Content Area - Use SingleChildScrollView + Flexible for safety
-                    Flexible(child: SingleChildScrollView(child: content)),
-                    const SizedBox(height: 20),
-                    // Actions Row (buttons)
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: actions,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // 2. The Title Header/Banner
-            Positioned(
-              top: 0,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 12,
-                  horizontal: 30,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.green.shade700, // Richer green for the banner
-                  borderRadius: BorderRadius.circular(50),
-                  border: Border.all(
-                    color: Colors.yellow.shade700,
-                    width: 4,
-                  ), // Bright border for pop
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.5),
-                      blurRadius: 8,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
-                ),
-                child: Text(
-                  title,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 28, // Bigger title for kids
-                    fontWeight: FontWeight.w900,
-                    color: titleColor,
-                    shadows: const [
-                      Shadow(
-                        offset: Offset(2, 2),
-                        blurRadius: 2.0,
-                        color: Colors.black,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            // 3. The Mascot Image (Optional, kept positioned for theme)
-            Positioned(
-              top: 35, // Adjust vertical position to overlap banner slightly
-              right: 15,
-              child: Image.asset(
-                mascotImagePath,
-                width: 70, // Slightly bigger mascot
-                height: 70,
-                fit: BoxFit.contain,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
