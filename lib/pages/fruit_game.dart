@@ -3,7 +3,7 @@ import 'dart:math';
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:audioplayers/audioplayers.dart';
-import 'package:confetti/confetti.dart'; // Import confetti
+import 'package:confetti/confetti.dart';
 
 class FruitGame extends StatefulWidget {
   const FruitGame({super.key});
@@ -16,7 +16,7 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
   int cherryCount = 0;
   int blueberryCount = 0;
   int totalScore = 0;
-  int timeLeft = 60;
+  int timeLeft = 30;
   bool gameActive = false;
   Timer? _timer;
   Timer? _mascotTimer;
@@ -117,7 +117,7 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
       cherryCount = 0;
       blueberryCount = 0;
       totalScore = 0;
-      timeLeft = 60;
+      timeLeft = 30;
       gameActive = false;
       currentFruit = null;
       isDragging = false;
@@ -136,7 +136,7 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
 
     setState(() {
       gameActive = true;
-      timeLeft = 60;
+      timeLeft = 30;
       cherryCount = 0;
       blueberryCount = 0;
       totalScore = 0;
@@ -162,6 +162,7 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
 
     setState(() {
       currentFruit = random.nextBool() ? FruitType.cherry : FruitType.blueberry;
+      // Start slightly lower to account for top bar
       fruitPosition = const Offset(0.31, 0.6);
       isDragging = false;
       showPoof = true;
@@ -239,20 +240,21 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
 
   Size _getGameAreaSize() {
     final mediaQuery = MediaQuery.of(context);
+    // Adjusted calculation to account for safe area
     return Size(mediaQuery.size.width, mediaQuery.size.height - 120);
   }
 
   Offset _getFruitCenter() {
     final gameSize = _getGameAreaSize();
+    // Adjusted offset calculation
     return Offset(
       fruitPosition.dx * gameSize.width,
       fruitPosition.dy * gameSize.height + 80,
     );
   }
 
-  // --- BACK NAVIGATION LOGIC ---
   Future<void> _onBackButtonPressed() async {
-    _timer?.cancel(); // Pause timer
+    _timer?.cancel();
 
     bool? shouldExit = await showDialog<bool>(
       context: context,
@@ -269,7 +271,6 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
             onPressed: () {
               Navigator.pop(context, false); // Stay
               if (gameActive) {
-                // Restart timer if game was active, rough fix since we lost exact seconds tick
                 _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
                   setState(() {
                     if (timeLeft > 0)
@@ -315,7 +316,6 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
     }
   }
 
-  // --- CUSTOM DIALOG BUILDER ---
   Widget _buildDialogContent({
     required String title,
     required Widget content,
@@ -477,32 +477,6 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildResultColumn(String emoji, int count) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.grey.shade300, width: 2),
-      ),
-      child: Column(
-        children: [
-          Text(emoji, style: const TextStyle(fontSize: 40)),
-          const SizedBox(height: 8),
-          Text(
-            '$count',
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Helper for star confetti
   Path _drawStar(Size size) {
     double cx = size.width / 2;
     double cy = size.height / 2;
@@ -526,6 +500,90 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
     return path;
   }
 
+  Widget _buildModernCounter(String emoji, int count, double fontSize) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.9),
+        borderRadius: BorderRadius.circular(25),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(emoji, style: TextStyle(fontSize: fontSize + 8)),
+          const SizedBox(width: 10),
+          Text(
+            '$count',
+            style: TextStyle(
+              fontSize: fontSize + 8,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _getFruitGlowColor() {
+    switch (currentFruit) {
+      case FruitType.cherry:
+        return Colors.red;
+      case FruitType.blueberry:
+        return Colors.blue;
+      default:
+        return Colors.yellow;
+    }
+  }
+
+  Widget _buildBasket({
+    required GlobalKey key,
+    required String image,
+    required double size,
+  }) {
+    return Container(
+      key: key,
+      child: Image.asset(image, width: size, height: size, fit: BoxFit.contain),
+    );
+  }
+
+  Widget _buildTimerDisplay(double fontSize) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    decoration: BoxDecoration(
+      color: Colors.white.withOpacity(0.9),
+      borderRadius: BorderRadius.circular(25),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.2),
+          blurRadius: 8,
+          offset: const Offset(0, 2),
+        ),
+      ],
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.timer, color: Colors.red, size: 20),
+        const SizedBox(width: 8),
+        Text(
+          '00:${timeLeft.toString().padLeft(2, '0')}',
+          style: TextStyle(
+            fontSize: fontSize,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          ),
+        ),
+      ],
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     _updateBasketPositions();
@@ -537,7 +595,13 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
     final baseFruitSize = isTablet ? 70.0 : 50.0;
     final draggingFruitSize = isTablet ? 100.0 : 80.0;
     final frogSize = isTablet ? 240.0 : 140.0;
-    final headerHeight = isTablet ? 100.0 : 80.0;
+
+    // Use SafeArea top padding if available, otherwise default to a reasonable margin
+    final safeTopPadding = MediaQuery.of(context).padding.top;
+    final topMargin = safeTopPadding > 0 ? safeTopPadding + 10 : 30.0;
+
+    // Adjust header height based on screen size + margin
+    final headerHeight = isTablet ? 100.0 + topMargin : 80.0 + topMargin;
     final fontSize = isTablet ? 20.0 : 12.0;
 
     return PopScope(
@@ -564,65 +628,60 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
                   115,
                 ).withOpacity(0.4),
                 child: SafeArea(
+                  // Using SafeArea to respect device notches/cutouts
                   left: false,
                   bottom: false,
+                  // IMPORTANT: Top is TRUE by default, keeping it TRUE ensures we respect the notch
+                  top: true,
                   child: Stack(
                     children: [
-                      // HEADER ROW (Score, Counters, Timer, EXIT BUTTON)
+                      // --- UPDATED HEADER (SPLIT) ---
+
+                      // 1. CENTER: Counters
                       Positioned(
-                        top: 0.03,
-                        left: 20,
+                        top: 10,
+                        left: 0,
+                        right: 0, // Stretch to allow centering
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            _buildModernCounter("🍒", cherryCount, fontSize),
+                            const SizedBox(width: 8),
+                            _buildModernCounter("🫐", blueberryCount, fontSize),
+                          ],
+                        ),
+                      ),
+
+                      // 2. RIGHT: Timer and Exit Button
+                      Positioned(
+                        top: 10,
                         right: 20,
                         child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            _buildScoreDisplay(fontSize),
-                            // Counters
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                _buildModernCounter(
-                                  "🍒",
-                                  cherryCount,
-                                  fontSize,
-                                ),
-                                const SizedBox(width: 8),
-                                _buildModernCounter(
-                                  "🫐",
-                                  blueberryCount,
-                                  fontSize,
-                                ),
-                              ],
-                            ),
-                            // Timer and Exit Button Group
-                            Row(
-                              children: [
-                                _buildTimerDisplay(fontSize),
-                                const SizedBox(width: 8),
-                                // NEW EXIT BUTTON
-                                Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.9),
-                                    shape: BoxShape.circle,
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withOpacity(0.2),
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
+                            _buildTimerDisplay(fontSize),
+                            const SizedBox(width: 8),
+                            // EXIT BUTTON
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.9),
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.2),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
                                   ),
-                                  child: GestureDetector(
-                                    onTap: _onBackButtonPressed,
-                                    child: const Icon(
-                                      Icons.exit_to_app_rounded,
-                                      color: Colors.red,
-                                      size: 24,
-                                    ),
-                                  ),
+                                ],
+                              ),
+                              child: GestureDetector(
+                                onTap: _onBackButtonPressed,
+                                child: const Icon(
+                                  Icons.exit_to_app_rounded,
+                                  color: Colors.red,
+                                  size: 24,
                                 ),
-                              ],
+                              ),
                             ),
                           ],
                         ),
@@ -674,7 +733,7 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
                           top:
                               fruitPosition.dy * _getGameAreaSize().height -
                               75 +
-                              headerHeight,
+                              headerHeight, // Adjusted for new header height
                           child: AnimatedBuilder(
                             animation: _poofController,
                             builder: (context, child) {
@@ -708,7 +767,7 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
                               fruitPosition.dy * _getGameAreaSize().height -
                               (isDragging ? draggingFruitSize : baseFruitSize) /
                                   2 +
-                              headerHeight,
+                              headerHeight, // Adjusted for new header height
                           child: GestureDetector(
                             onPanStart: _onDragStart,
                             onPanUpdate: _onDragUpdate,
@@ -805,8 +864,6 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
             ),
 
             // --- CONFETTI CANNONS (7 Sources) ---
-
-            // 1. Top Center
             Align(
               alignment: Alignment.topCenter,
               child: ConfettiWidget(
@@ -829,7 +886,6 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
                 createParticlePath: _drawStar,
               ),
             ),
-            // 2. Top Left
             Align(
               alignment: Alignment.topLeft,
               child: ConfettiWidget(
@@ -840,16 +896,10 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
                 emissionFrequency: 0.1,
                 numberOfParticles: 25,
                 gravity: 0.2,
-                colors: const [
-                  Colors.green,
-                  Colors.blue,
-                  Colors.pink,
-                  Colors.orange,
-                ],
+                colors: const [Colors.green, Colors.blue, Colors.pink],
                 createParticlePath: _drawStar,
               ),
             ),
-            // 3. Top Right
             Align(
               alignment: Alignment.topRight,
               child: ConfettiWidget(
@@ -860,16 +910,10 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
                 emissionFrequency: 0.1,
                 numberOfParticles: 25,
                 gravity: 0.2,
-                colors: const [
-                  Colors.purple,
-                  Colors.amber,
-                  Colors.red,
-                  Colors.cyan,
-                ],
+                colors: const [Colors.purple, Colors.amber, Colors.red],
                 createParticlePath: _drawStar,
               ),
             ),
-            // 4. Center Left
             Align(
               alignment: Alignment.centerLeft,
               child: ConfettiWidget(
@@ -884,7 +928,6 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
                 createParticlePath: _drawStar,
               ),
             ),
-            // 5. Center Right
             Align(
               alignment: Alignment.centerRight,
               child: ConfettiWidget(
@@ -899,7 +942,6 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
                 createParticlePath: _drawStar,
               ),
             ),
-            // 6. Bottom Left
             Align(
               alignment: Alignment.bottomLeft,
               child: ConfettiWidget(
@@ -914,7 +956,6 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
                 createParticlePath: _drawStar,
               ),
             ),
-            // 7. Bottom Right
             Align(
               alignment: Alignment.bottomRight,
               child: ConfettiWidget(
@@ -925,11 +966,7 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
                 emissionFrequency: 0.08,
                 numberOfParticles: 15,
                 gravity: 0.3,
-                colors: const [
-                  Colors.pinkAccent,
-                  Colors.deepOrange,
-                  Colors.lightBlueAccent,
-                ],
+                colors: const [Colors.pinkAccent, Colors.deepOrange],
                 createParticlePath: _drawStar,
               ),
             ),
@@ -938,123 +975,8 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
       ),
     );
   }
-
-  Widget _buildModernCounter(String emoji, int count, double fontSize) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.9),
-        borderRadius: BorderRadius.circular(25),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(emoji, style: TextStyle(fontSize: fontSize + 8)),
-          const SizedBox(width: 10),
-          Text(
-            '$count',
-            style: TextStyle(
-              fontSize: fontSize + 8,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Color _getFruitGlowColor() {
-    switch (currentFruit) {
-      case FruitType.cherry:
-        return Colors.red;
-      case FruitType.blueberry:
-        return Colors.blue;
-      default:
-        return Colors.yellow;
-    }
-  }
-
-  Widget _buildBasket({
-    required GlobalKey key,
-    required String image,
-    required double size,
-  }) {
-    return Container(
-      key: key,
-      child: Image.asset(image, width: size, height: size, fit: BoxFit.contain),
-    );
-  }
-
-  Widget _buildScoreDisplay(double fontSize) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-    decoration: BoxDecoration(
-      color: Colors.white.withOpacity(0.9),
-      borderRadius: BorderRadius.circular(25),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.2),
-          blurRadius: 8,
-          offset: const Offset(0, 2),
-        ),
-      ],
-    ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const Icon(Icons.emoji_events, color: Colors.amber, size: 20),
-        const SizedBox(width: 8),
-        Text(
-          '$totalScore',
-          style: TextStyle(
-            fontSize: fontSize,
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
-          ),
-        ),
-      ],
-    ),
-  );
-
-  Widget _buildTimerDisplay(double fontSize) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-    decoration: BoxDecoration(
-      color: Colors.white.withOpacity(0.9),
-      borderRadius: BorderRadius.circular(25),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.2),
-          blurRadius: 8,
-          offset: const Offset(0, 2),
-        ),
-      ],
-    ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const Icon(Icons.timer, color: Colors.red, size: 20),
-        const SizedBox(width: 8),
-        Text(
-          '00:${timeLeft.toString().padLeft(2, '0')}',
-          style: TextStyle(
-            fontSize: fontSize,
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
-          ),
-        ),
-      ],
-    ),
-  );
 }
 
-// Custom painter for the poof effect
 class PoofPainter extends CustomPainter {
   final Color color;
 
@@ -1068,7 +990,6 @@ class PoofPainter extends CustomPainter {
 
     final center = Offset(size.width / 2, size.height / 2);
 
-    final random = Random(42);
     for (int i = 0; i < 8; i++) {
       final angle = (i * math.pi * 2) / 8;
       final radius = size.width * 0.15;
@@ -1082,10 +1003,8 @@ class PoofPainter extends CustomPainter {
       canvas.drawCircle(offset, radius, paint);
     }
 
-    // Draw center circle
     canvas.drawCircle(center, size.width * 0.2, paint);
 
-    // Draw sparkles
     final sparklePaint = Paint()
       ..color = Colors.white.withOpacity(0.8)
       ..style = PaintingStyle.fill;

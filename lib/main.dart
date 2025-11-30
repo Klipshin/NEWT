@@ -5,7 +5,10 @@ import 'pages/landing_page.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Lock orientation to landscape
+  // 1. Hide the status bars (Battery, Time, WiFi, etc.)
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+
+  // 2. Lock orientation to landscape
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.landscapeLeft,
     DeviceOrientation.landscapeRight,

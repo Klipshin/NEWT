@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:math' as math; // Alias math to avoid conflicts
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:confetti/confetti.dart';
@@ -50,6 +50,7 @@ class _GuessAnimalGameState extends State<GuessAnimalGame> {
   late AudioPlayer _bgMusicPlayer;
   late ConfettiController _bgConfettiController; // Background celebrations
   late ConfettiController _dialogConfettiController; // Popups celebrations
+  late ConfettiController _burstConfettiController; // Single answer burst
 
   @override
   void initState() {
@@ -60,6 +61,10 @@ class _GuessAnimalGameState extends State<GuessAnimalGame> {
     );
     _dialogConfettiController = ConfettiController(
       duration: const Duration(seconds: 1),
+    );
+    // Short burst for correct answers
+    _burstConfettiController = ConfettiController(
+      duration: const Duration(milliseconds: 500),
     );
 
     _bgMusicPlayer = AudioPlayer();
@@ -73,6 +78,7 @@ class _GuessAnimalGameState extends State<GuessAnimalGame> {
     _bgMusicPlayer.dispose();
     _bgConfettiController.dispose();
     _dialogConfettiController.dispose();
+    _burstConfettiController.dispose();
     super.dispose();
   }
 
@@ -115,6 +121,7 @@ class _GuessAnimalGameState extends State<GuessAnimalGame> {
       selectedName = null;
       _bgConfettiController.stop();
       _dialogConfettiController.stop();
+      _burstConfettiController.stop();
 
       List<Animal> shuffled = List.from(allAnimals);
       shuffled.shuffle();
@@ -124,9 +131,6 @@ class _GuessAnimalGameState extends State<GuessAnimalGame> {
   }
 
   void _loadQuestion() {
-    // NOTE: The Game Over check has been moved to _select
-    // to prevent the UI from rendering "11/10" briefly.
-
     setState(() {
       hasAnswered = false;
       selectedName = null;
@@ -147,25 +151,23 @@ class _GuessAnimalGameState extends State<GuessAnimalGame> {
   void _select(String name) {
     if (hasAnswered) return;
 
+    final correct = name == currentAnimal!.name;
+
     setState(() {
       hasAnswered = true;
       selectedName = name;
-    });
 
-    final correct = name == currentAnimal!.name;
-    if (correct) {
-      score++;
-    }
+      if (correct) {
+        score++;
+        _burstConfettiController.play(); // Play JUST the confetti burst
+      }
+    });
 
     Timer(const Duration(milliseconds: 1200), () {
       if (mounted) {
-        // --- FIXED LOGIC HERE ---
-        // Check if we just answered the last question (index 9 if total is 10)
         if (currentQuestionIndex >= totalQuestions - 1) {
-          // Do NOT increment index. Just show results.
           _showGameCompleteDialog();
         } else {
-          // Move to next question
           setState(() {
             currentQuestionIndex++;
           });
@@ -226,14 +228,14 @@ class _GuessAnimalGameState extends State<GuessAnimalGame> {
               ],
             ),
           ),
-          // Confetti for the dialog itself
           ConfettiWidget(
             confettiController: _dialogConfettiController,
-            blastDirection: math.pi / 2, // Downwards
+            blastDirection: math.pi / 2,
             maxBlastForce: 20,
             minBlastForce: 10,
-            emissionFrequency: 0.2,
-            numberOfParticles: 15,
+            emissionFrequency:
+                0.15, // Changed from 0.2 for more frequent emission
+            numberOfParticles: 25, // Changed from 15 for more particles
             gravity: 0.5,
             shouldLoop: false,
             colors: const [Colors.yellow, Colors.lightGreen, Colors.lightBlue],
@@ -243,8 +245,6 @@ class _GuessAnimalGameState extends State<GuessAnimalGame> {
       ),
     );
   }
-
-  // --- POPUPS USING THE SHARED BUILDER ---
 
   Future<void> _onBackButtonPressed() async {
     bool? shouldExit = await showDialog<bool>(
@@ -344,6 +344,7 @@ class _GuessAnimalGameState extends State<GuessAnimalGame> {
   Widget _choiceCard(Animal a) {
     final bool isSelected = selectedName == a.name;
     final bool isCorrect = a.name == currentAnimal?.name;
+
     Color? backgroundColor;
     Color? borderColor;
 
@@ -465,6 +466,7 @@ class _GuessAnimalGameState extends State<GuessAnimalGame> {
       },
       child: Scaffold(
         body: Stack(
+          alignment: Alignment.center,
           children: [
             // Background & Game Content
             Container(
@@ -607,7 +609,6 @@ class _GuessAnimalGameState extends State<GuessAnimalGame> {
                                     const SizedBox(height: 20),
                                     _buildSideStatItem(
                                       'Question',
-                                      // Display 1-based index
                                       '${currentQuestionIndex + 1}/$totalQuestions',
                                       Icons.quiz,
                                     ),
@@ -657,8 +658,8 @@ class _GuessAnimalGameState extends State<GuessAnimalGame> {
                 blastDirection: math.pi / 2,
                 maxBlastForce: 10,
                 minBlastForce: 5,
-                emissionFrequency: 0.08,
-                numberOfParticles: 30,
+                emissionFrequency: 0.05, // Changed from 0.08
+                numberOfParticles: 50, // Changed from 30 for more particles
                 colors: const [
                   Colors.green,
                   Colors.blue,
@@ -668,71 +669,26 @@ class _GuessAnimalGameState extends State<GuessAnimalGame> {
                 createParticlePath: drawStar,
               ),
             ),
+
+            // --- BURST CONFETTI (Center for correct answers) ---
             Align(
-              alignment: Alignment.topLeft,
+              alignment: Alignment.center,
               child: ConfettiWidget(
-                confettiController: _bgConfettiController,
-                blastDirection: math.pi / 3,
-                emissionFrequency: 0.1,
-                numberOfParticles: 25,
-                colors: const [Colors.green, Colors.blue, Colors.pink],
-                createParticlePath: drawStar,
-              ),
-            ),
-            Align(
-              alignment: Alignment.topRight,
-              child: ConfettiWidget(
-                confettiController: _bgConfettiController,
-                blastDirection: 2 * math.pi / 3,
-                emissionFrequency: 0.1,
-                numberOfParticles: 25,
-                colors: const [Colors.purple, Colors.amber, Colors.red],
-                createParticlePath: drawStar,
-              ),
-            ),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: ConfettiWidget(
-                confettiController: _bgConfettiController,
-                blastDirection: 0,
-                maxBlastForce: 15,
-                emissionFrequency: 0.08,
-                numberOfParticles: 20,
-                colors: const [Colors.yellow, Colors.orange, Colors.red],
-                createParticlePath: drawStar,
-              ),
-            ),
-            Align(
-              alignment: Alignment.centerRight,
-              child: ConfettiWidget(
-                confettiController: _bgConfettiController,
-                blastDirection: math.pi,
-                maxBlastForce: 15,
-                emissionFrequency: 0.08,
-                numberOfParticles: 20,
-                colors: const [Colors.blue, Colors.cyan, Colors.purple],
-                createParticlePath: drawStar,
-              ),
-            ),
-            Align(
-              alignment: Alignment.bottomLeft,
-              child: ConfettiWidget(
-                confettiController: _bgConfettiController,
-                blastDirection: -math.pi / 4,
-                emissionFrequency: 0.08,
-                numberOfParticles: 15,
-                colors: const [Colors.teal, Colors.lime, Colors.indigo],
-                createParticlePath: drawStar,
-              ),
-            ),
-            Align(
-              alignment: Alignment.bottomRight,
-              child: ConfettiWidget(
-                confettiController: _bgConfettiController,
-                blastDirection: -3 * math.pi / 4,
-                emissionFrequency: 0.08,
-                numberOfParticles: 15,
-                colors: const [Colors.pinkAccent, Colors.deepOrange],
+                confettiController: _burstConfettiController,
+                blastDirectionality:
+                    BlastDirectionality.explosive, // Explode in all directions
+                maxBlastForce: 20,
+                minBlastForce: 8,
+                emissionFrequency: 0.03, // Changed from 0.05
+                numberOfParticles: 35, // Changed from 20 for more particles
+                gravity: 0.3,
+                shouldLoop: false,
+                colors: const [
+                  Colors.yellow,
+                  Colors.green,
+                  Colors.orange,
+                  Colors.purple,
+                ],
                 createParticlePath: drawStar,
               ),
             ),

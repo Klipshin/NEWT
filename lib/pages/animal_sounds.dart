@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
-import 'package:confetti/confetti.dart'; // Added Confetti
+import 'package:confetti/confetti.dart';
 
 class AnimalSoundsQuiz extends StatefulWidget {
   const AnimalSoundsQuiz({super.key});
@@ -16,9 +16,14 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
   late AudioPlayer _soundPlayer;
   late AudioPlayer _bgMusicPlayer;
 
-  // --- NEW: Confetti Controllers ---
+  // --- Confetti Controllers ---
   late ConfettiController _bgConfettiController;
   late ConfettiController _dialogConfettiController;
+  late ConfettiController _correctBurstController;
+
+  // --- ADDED: Define sizes for bigger confetti ---
+  final Size confettiMinSize = const Size(20, 20);
+  final Size confettiMaxSize = const Size(35, 35);
 
   int currentScore = 0;
   int questionsAnswered = 0;
@@ -111,12 +116,15 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
   void initState() {
     super.initState();
 
-    // Initialize Confetti
     _bgConfettiController = ConfettiController(
       duration: const Duration(seconds: 3),
     );
     _dialogConfettiController = ConfettiController(
       duration: const Duration(seconds: 1),
+    );
+
+    _correctBurstController = ConfettiController(
+      duration: const Duration(milliseconds: 500),
     );
 
     _soundPlayer = AudioPlayer();
@@ -144,6 +152,8 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
     _wrongController.dispose();
     _bgConfettiController.dispose();
     _dialogConfettiController.dispose();
+    _correctBurstController.dispose();
+
     super.dispose();
   }
 
@@ -152,7 +162,6 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
     await _bgMusicPlayer.play(AssetSource('sounds/card.mp3'));
   }
 
-  // --- STAR PATH FOR CONFETTI ---
   Path drawStar(Size size) {
     double cx = size.width / 2;
     double cy = size.height / 2;
@@ -188,6 +197,7 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
 
     _bgConfettiController.stop();
     _dialogConfettiController.stop();
+    _correctBurstController.stop();
 
     _gameTimer?.cancel();
     _startGameTimer();
@@ -281,6 +291,9 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
     if (isCorrect) {
       currentScore += 10;
       timeRemaining += 3;
+
+      _correctBurstController.play();
+
       _correctController.forward().then((_) => _correctController.reset());
     } else {
       _wrongController.forward().then((_) => _wrongController.reset());
@@ -295,7 +308,7 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
     });
   }
 
-  // --- SHARED DIALOG BUILDER (Standard Style) ---
+  // --- SHARED DIALOG BUILDER ---
   Widget _buildDialogContent(
     String title,
     String message,
@@ -348,6 +361,9 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
           ),
           ConfettiWidget(
             confettiController: _dialogConfettiController,
+            // --- ADDED SIZES HERE ---
+            minimumSize: confettiMinSize,
+            maximumSize: confettiMaxSize,
             blastDirection: pi / 2,
             maxBlastForce: 20,
             minBlastForce: 10,
@@ -364,7 +380,6 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
   }
 
   // --- DIALOG LOGIC ---
-
   void _showVictoryDialog() {
     _bgConfettiController.play();
     _dialogConfettiController.play();
@@ -452,9 +467,8 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
     );
   }
 
-  // --- NAVIGATION SAFETY ---
   Future<void> _onBackButtonPressed() async {
-    _gameTimer?.cancel(); // Pause timer
+    _gameTimer?.cancel();
 
     bool? shouldExit = await showDialog<bool>(
       context: context,
@@ -466,7 +480,7 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context, false);
-              _startGameTimer(); // Resume timer
+              _startGameTimer();
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.green,
@@ -502,7 +516,6 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
 
   @override
   Widget build(BuildContext context) {
-    // Wrap with PopScope for safety
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
@@ -529,7 +542,6 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
                 ).withOpacity(0.3),
                 child: Column(
                   children: [
-                    // Top bar with play button and question
                     Container(
                       padding: const EdgeInsets.symmetric(
                         vertical: 12,
@@ -537,7 +549,6 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
                       ),
                       child: Column(
                         children: [
-                          // Sound player button
                           GestureDetector(
                             onTap: _playCurrentSound,
                             child: AnimatedContainer(
@@ -562,7 +573,6 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
                             ),
                           ),
                           const SizedBox(height: 12),
-                          // Question text
                           Text(
                             'Which animal makes this sound?',
                             style: TextStyle(
@@ -582,7 +592,6 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
                       ),
                     ),
 
-                    // Animal choices row
                     Expanded(
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
@@ -612,7 +621,6 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
                       ),
                     ),
 
-                    // Bottom stats bar
                     Container(
                       padding: const EdgeInsets.symmetric(
                         vertical: 8,
@@ -630,7 +638,6 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
                             Icons.quiz,
                             '${questionsAnswered + 1}/$totalQuestions',
                           ),
-                          // Explicit Exit Button
                           IconButton(
                             onPressed: _onBackButtonPressed,
                             icon: const Icon(Icons.exit_to_app_rounded),
@@ -645,11 +652,40 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
               ),
             ),
 
-            // Layer 2: Background Confetti System
+            // --- Specific Center Burst Confetti ---
+            Align(
+              alignment: Alignment.center,
+              child: ConfettiWidget(
+                confettiController: _correctBurstController,
+                // --- ADDED SIZES HERE ---
+                minimumSize: confettiMinSize,
+                maximumSize: confettiMaxSize,
+                blastDirectionality: BlastDirectionality.explosive,
+                shouldLoop: false,
+                colors: const [
+                  Colors.green,
+                  Colors.blue,
+                  Colors.pink,
+                  Colors.orange,
+                  Colors.purple,
+                ],
+                createParticlePath: drawStar,
+                emissionFrequency: 0.05,
+                numberOfParticles: 20,
+                maxBlastForce: 20,
+                minBlastForce: 5,
+                gravity: 0.3,
+              ),
+            ),
+
+            // Layer 2: Background Confetti System (Victory Confetti)
+            // --- ADDED SIZES TO ALL BACKGROUND WIDGETS BELOW ---
             Align(
               alignment: Alignment.topCenter,
               child: ConfettiWidget(
                 confettiController: _bgConfettiController,
+                minimumSize: confettiMinSize,
+                maximumSize: confettiMaxSize,
                 blastDirection: pi / 2,
                 maxBlastForce: 10,
                 minBlastForce: 5,
@@ -668,6 +704,8 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
               alignment: Alignment.topLeft,
               child: ConfettiWidget(
                 confettiController: _bgConfettiController,
+                minimumSize: confettiMinSize,
+                maximumSize: confettiMaxSize,
                 blastDirection: pi / 3,
                 emissionFrequency: 0.1,
                 numberOfParticles: 25,
@@ -679,6 +717,8 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
               alignment: Alignment.topRight,
               child: ConfettiWidget(
                 confettiController: _bgConfettiController,
+                minimumSize: confettiMinSize,
+                maximumSize: confettiMaxSize,
                 blastDirection: 2 * pi / 3,
                 emissionFrequency: 0.1,
                 numberOfParticles: 25,
@@ -690,6 +730,8 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
               alignment: Alignment.centerLeft,
               child: ConfettiWidget(
                 confettiController: _bgConfettiController,
+                minimumSize: confettiMinSize,
+                maximumSize: confettiMaxSize,
                 blastDirection: 0,
                 maxBlastForce: 15,
                 emissionFrequency: 0.08,
@@ -702,6 +744,8 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
               alignment: Alignment.centerRight,
               child: ConfettiWidget(
                 confettiController: _bgConfettiController,
+                minimumSize: confettiMinSize,
+                maximumSize: confettiMaxSize,
                 blastDirection: pi,
                 maxBlastForce: 15,
                 emissionFrequency: 0.08,
@@ -714,6 +758,8 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
               alignment: Alignment.bottomLeft,
               child: ConfettiWidget(
                 confettiController: _bgConfettiController,
+                minimumSize: confettiMinSize,
+                maximumSize: confettiMaxSize,
                 blastDirection: -pi / 4,
                 emissionFrequency: 0.08,
                 numberOfParticles: 15,
@@ -725,6 +771,8 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
               alignment: Alignment.bottomRight,
               child: ConfettiWidget(
                 confettiController: _bgConfettiController,
+                minimumSize: confettiMinSize,
+                maximumSize: confettiMaxSize,
                 blastDirection: -3 * pi / 4,
                 emissionFrequency: 0.08,
                 numberOfParticles: 15,

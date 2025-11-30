@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
-import 'package:confetti/confetti.dart'; // Added
+import 'package:confetti/confetti.dart';
 
 class ConnectDotsGame extends StatefulWidget {
   const ConnectDotsGame({super.key});
@@ -23,10 +23,14 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
   int _frogFrame = 0;
   Timer? _mascotTimer;
 
-  // --- NEW: Audio & Effects ---
+  // --- Audio & Effects ---
   late AudioPlayer _bgMusicPlayer;
   late ConfettiController _bgConfettiController;
   late ConfettiController _dialogConfettiController;
+
+  // --- ADDED: Bigger Confetti Settings ---
+  final Size confettiMinSize = const Size(20, 20);
+  final Size confettiMaxSize = const Size(35, 35);
 
   bool gameComplete = false;
 
@@ -58,7 +62,6 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
   void initState() {
     super.initState();
 
-    // Initialize Confetti
     _bgConfettiController = ConfettiController(
       duration: const Duration(seconds: 3),
     );
@@ -66,7 +69,6 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
       duration: const Duration(seconds: 1),
     );
 
-    // Initialize Audio
     _bgMusicPlayer = AudioPlayer();
     _playBackgroundMusic();
 
@@ -100,7 +102,6 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
     });
   }
 
-  // --- STAR PATH FOR CONFETTI ---
   Path drawStar(Size size) {
     double cx = size.width / 2;
     double cy = size.height / 2;
@@ -158,7 +159,6 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
     currentColor = null;
     paths.clear();
 
-    // Stop effects
     _bgConfettiController.stop();
     _dialogConfettiController.stop();
 
@@ -187,7 +187,6 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
       bool pathCreated = false;
       int attempts = 0;
 
-      // Safety check
       for (int y = 0; y < gridSize; y++) {
         for (int x = 0; x < gridSize; x++) {
           if (grid[y][x] == color) {
@@ -417,7 +416,7 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
     }
   }
 
-  // --- SHARED DIALOG BUILDER (Standard Style) ---
+  // --- SHARED DIALOG BUILDER ---
   Widget _buildDialogContent(
     String title,
     String message,
@@ -477,6 +476,9 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
             numberOfParticles: 15,
             gravity: 0.5,
             shouldLoop: false,
+            // --- Bigger Confetti ---
+            minimumSize: confettiMinSize,
+            maximumSize: confettiMaxSize,
             colors: const [Colors.yellow, Colors.lightGreen, Colors.lightBlue],
             createParticlePath: drawStar,
           ),
@@ -489,12 +491,17 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
     _bgConfettiController.play();
     _dialogConfettiController.play();
 
+    // --- MODIFIED: Dynamic Label ---
+    String statusMsg = level >= 7
+        ? 'Endless Score: $puzzlesSolved'
+        : 'Puzzle $puzzlesSolved/2';
+
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => _buildDialogContent(
         '🎉 Excellent!',
-        'You connected all dots! Puzzle $puzzlesSolved/2',
+        'You connected all dots! $statusMsg',
         [
           ElevatedButton(
             onPressed: () {
@@ -595,15 +602,6 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
     }
   }
 
-  void _resetProgress() {
-    setState(() {
-      level = 1;
-      puzzlesSolved = 0;
-      _updateColorsForLevel();
-      _initializeGame();
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -669,7 +667,8 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
                           ),
                         ),
                       ),
-                      // Game grid
+
+                      // --- MODIFIED: Grid Alignment Fix ---
                       Expanded(
                         flex: 2,
                         child: Center(
@@ -677,12 +676,20 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
                             aspectRatio: 1,
                             child: LayoutBuilder(
                               builder: (context, constraints) {
-                                final cellSize =
-                                    constraints.maxWidth / gridSize;
+                                // 1. Account for padding in math
+                                final double paddingValue =
+                                    constraints.maxWidth * 0.02;
+                                // 2. Account for border width (2px * 2)
+                                final double borderWidth = 4.0;
+                                // 3. Calculate actual available width for dots
+                                final double availableWidth =
+                                    constraints.maxWidth -
+                                    (paddingValue * 2) -
+                                    borderWidth;
+                                final cellSize = availableWidth / gridSize;
+
                                 return Container(
-                                  padding: EdgeInsets.all(
-                                    constraints.maxWidth * 0.02,
-                                  ),
+                                  padding: EdgeInsets.all(paddingValue),
                                   child: GameGrid(
                                     key: ValueKey(
                                       'grid-$gridSize-$level-$puzzlesSolved',
@@ -702,6 +709,7 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
                           ),
                         ),
                       ),
+
                       // Right sidebar
                       Container(
                         width: 90,
@@ -712,11 +720,18 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
                             children: [
                               _buildStatItem("Level", "$level", Icons.star),
                               const SizedBox(height: 15),
+
+                              // --- MODIFIED: Endless Score Logic ---
                               _buildStatItem(
-                                "Puzzle",
-                                "$puzzlesSolved/2",
-                                Icons.extension,
+                                level >= 7 ? "Score" : "Puzzle",
+                                level >= 7
+                                    ? "$puzzlesSolved"
+                                    : "$puzzlesSolved/2",
+                                level >= 7
+                                    ? Icons.emoji_events
+                                    : Icons.extension,
                               ),
+
                               const SizedBox(height: 15),
                               _buildStatItem(
                                 "Colors",
@@ -765,7 +780,7 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
               ),
             ),
 
-            // --- CONFETTI OVERLAYS ---
+            // --- CONFETTI OVERLAYS (Bigger sizes applied) ---
             Align(
               alignment: Alignment.topCenter,
               child: ConfettiWidget(
@@ -775,6 +790,8 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
                 minBlastForce: 5,
                 emissionFrequency: 0.08,
                 numberOfParticles: 30,
+                minimumSize: confettiMinSize,
+                maximumSize: confettiMaxSize,
                 colors: const [
                   Colors.green,
                   Colors.blue,
@@ -791,6 +808,8 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
                 blastDirection: pi / 3,
                 emissionFrequency: 0.1,
                 numberOfParticles: 25,
+                minimumSize: confettiMinSize,
+                maximumSize: confettiMaxSize,
                 colors: const [Colors.green, Colors.blue, Colors.pink],
                 createParticlePath: drawStar,
               ),
@@ -802,6 +821,8 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
                 blastDirection: 2 * pi / 3,
                 emissionFrequency: 0.1,
                 numberOfParticles: 25,
+                minimumSize: confettiMinSize,
+                maximumSize: confettiMaxSize,
                 colors: const [Colors.purple, Colors.amber, Colors.red],
                 createParticlePath: drawStar,
               ),
@@ -814,6 +835,8 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
                 maxBlastForce: 15,
                 emissionFrequency: 0.08,
                 numberOfParticles: 20,
+                minimumSize: confettiMinSize,
+                maximumSize: confettiMaxSize,
                 colors: const [Colors.yellow, Colors.orange, Colors.red],
                 createParticlePath: drawStar,
               ),
@@ -826,6 +849,8 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
                 maxBlastForce: 15,
                 emissionFrequency: 0.08,
                 numberOfParticles: 20,
+                minimumSize: confettiMinSize,
+                maximumSize: confettiMaxSize,
                 colors: const [Colors.blue, Colors.cyan, Colors.purple],
                 createParticlePath: drawStar,
               ),
@@ -837,6 +862,8 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
                 blastDirection: -pi / 4,
                 emissionFrequency: 0.08,
                 numberOfParticles: 15,
+                minimumSize: confettiMinSize,
+                maximumSize: confettiMaxSize,
                 colors: const [Colors.teal, Colors.lime, Colors.indigo],
                 createParticlePath: drawStar,
               ),
@@ -848,6 +875,8 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
                 blastDirection: -3 * pi / 4,
                 emissionFrequency: 0.08,
                 numberOfParticles: 15,
+                minimumSize: confettiMinSize,
+                maximumSize: confettiMaxSize,
                 colors: const [Colors.pinkAccent, Colors.deepOrange],
                 createParticlePath: drawStar,
               ),
@@ -940,7 +969,6 @@ class _GameGridState extends State<GameGrid> {
     }
   }
 
-  // --- Polished Dot Widget ---
   Widget _buildDot(String colorName, bool isConnected) {
     Color baseColor = widget.colorMap[colorName]!;
 
@@ -952,11 +980,8 @@ class _GameGridState extends State<GameGrid> {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           gradient: RadialGradient(
-            colors: [
-              baseColor.withOpacity(0.7), // Lighter center
-              baseColor, // Darker edge
-            ],
-            center: const Alignment(-0.3, -0.3), // Highlight offset
+            colors: [baseColor.withOpacity(0.7), baseColor],
+            center: const Alignment(-0.3, -0.3),
           ),
           boxShadow: [
             BoxShadow(
@@ -1001,7 +1026,7 @@ class _GameGridState extends State<GameGrid> {
         ),
         child: Stack(
           children: [
-            // Grid Lines (Optional visual guide)
+            // Grid Lines
             CustomPaint(
               size: Size(
                 widget.cellSize * widget.gridSize,
@@ -1010,7 +1035,7 @@ class _GameGridState extends State<GameGrid> {
               painter: GridLinesPainter(widget.gridSize, widget.cellSize),
             ),
 
-            // Lines layer (Drawn under dots)
+            // Lines layer
             CustomPaint(
               size: Size(
                 widget.cellSize * widget.gridSize,
@@ -1027,6 +1052,8 @@ class _GameGridState extends State<GameGrid> {
             // Dots layer
             GridView.builder(
               physics: const NeverScrollableScrollPhysics(),
+              // --- MODIFIED: Ensure dots align perfectly with grid ---
+              padding: EdgeInsets.zero,
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: widget.gridSize,
                 childAspectRatio: 1,
@@ -1038,12 +1065,10 @@ class _GameGridState extends State<GameGrid> {
                 String? color = widget.grid[y][x];
 
                 if (color != null && widget.colors.contains(color)) {
-                  // Check if this dot is part of a completed or active path
                   bool isConnected = false;
                   if (widget.paths.containsKey(color)) {
                     final path = widget.paths[color]!;
                     final dotPos = Offset(x.toDouble(), y.toDouble());
-                    // It's "connected" if it's the start or end of a valid path
                     isConnected =
                         (path.first == dotPos || path.last == dotPos) &&
                         _isValidConnection(color, path);
@@ -1111,16 +1136,12 @@ class PathPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Base stroke (Solid color)
     final paint = Paint()
-      ..strokeWidth =
-          cellSize *
-          0.3 // Thicker lines
+      ..strokeWidth = cellSize * 0.3
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
       ..style = PaintingStyle.stroke;
 
-    // Inner glow/highlight stroke
     final highlightPaint = Paint()
       ..strokeWidth = cellSize * 0.1
       ..strokeCap = StrokeCap.round
@@ -1128,7 +1149,6 @@ class PathPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..color = Colors.white.withOpacity(0.3);
 
-    // Shadow for the line
     final shadowPaint = Paint()
       ..strokeWidth = cellSize * 0.3
       ..strokeCap = StrokeCap.round
@@ -1155,7 +1175,6 @@ class PathPainter extends CustomPainter {
           );
         }
 
-        // Draw shadow, then base line, then highlight
         canvas.drawPath(path, shadowPaint);
         canvas.drawPath(path, paint);
         canvas.drawPath(path, highlightPaint);
