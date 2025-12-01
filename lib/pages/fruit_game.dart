@@ -20,6 +20,7 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
   bool gameActive = false;
   Timer? _timer;
   Timer? _mascotTimer;
+  bool _showDCardOverlay = true;
 
   FruitType? currentFruit;
   Offset fruitPosition = Offset.zero;
@@ -133,6 +134,9 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
 
   void _startGame() {
     if (gameActive) return;
+
+    // Only start if overlay is dismissed
+    if (_showDCardOverlay) return;
 
     setState(() {
       gameActive = true;
@@ -270,7 +274,7 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context, false); // Stay
-              if (gameActive) {
+              if (gameActive && !_showDCardOverlay) {
                 _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
                   setState(() {
                     if (timeLeft > 0)
@@ -970,6 +974,27 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
                 createParticlePath: _drawStar,
               ),
             ),
+            // DFruit Overlay - stuck to bottom
+            if (_showDCardOverlay)
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _showDCardOverlay = false;
+                  });
+                },
+                child: Container(
+                  color: Colors.black.withOpacity(0.75),
+                  child: Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Image.asset(
+                      'assets/images/dfruit.png',
+                      width: MediaQuery.of(context).size.width * 0.9,
+                      height: MediaQuery.of(context).size.height * 0.6,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),

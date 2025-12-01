@@ -45,6 +45,7 @@ class _GuessAnimalGameState extends State<GuessAnimalGame> {
   int score = 0;
   bool hasAnswered = false;
   String? selectedName;
+  bool _showDCardOverlay = true;
 
   // Audio and Effects
   late AudioPlayer _bgMusicPlayer;
@@ -692,6 +693,27 @@ class _GuessAnimalGameState extends State<GuessAnimalGame> {
                 createParticlePath: drawStar,
               ),
             ),
+            // DGuess Overlay - stuck to bottom
+            if (_showDCardOverlay)
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _showDCardOverlay = false;
+                  });
+                },
+                child: Container(
+                  color: Colors.black.withOpacity(0.75),
+                  child: Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Image.asset(
+                      'assets/images/dguess.png',
+                      width: MediaQuery.of(context).size.width * 1.0,
+                      height: MediaQuery.of(context).size.height * 0.6,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),

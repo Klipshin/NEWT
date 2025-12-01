@@ -15,6 +15,7 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
     with TickerProviderStateMixin {
   late AudioPlayer _soundPlayer;
   late AudioPlayer _bgMusicPlayer;
+  bool _showDCardOverlay = true;
 
   // --- Confetti Controllers ---
   late ConfettiController _bgConfettiController;
@@ -200,7 +201,10 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
     _correctBurstController.stop();
 
     _gameTimer?.cancel();
-    _startGameTimer();
+    // Only start timer if overlay is not showing
+    if (!_showDCardOverlay) {
+      _startGameTimer();
+    }
     _loadNextQuestion();
   }
 
@@ -480,7 +484,9 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context, false);
-              _startGameTimer();
+              if (!_showDCardOverlay) {
+                _startGameTimer();
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.green,
@@ -780,6 +786,28 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
                 createParticlePath: drawStar,
               ),
             ),
+            // DAnimal Overlay - stuck to bottom
+            if (_showDCardOverlay)
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _showDCardOverlay = false;
+                  });
+                  _startGameTimer();
+                },
+                child: Container(
+                  color: Colors.black.withOpacity(0.75),
+                  child: Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Image.asset(
+                      'assets/images/dsounds.png',
+                      width: MediaQuery.of(context).size.width * 0.9,
+                      height: MediaQuery.of(context).size.height * 0.6,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),

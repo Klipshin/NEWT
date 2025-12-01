@@ -16,6 +16,7 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
   int gridSize = 4; // Start with 4x4
   int level = 1;
   int puzzlesSolved = 0;
+  bool _showDCardOverlay = true;
 
   late List<List<String?>> grid;
   String? currentColor;
@@ -881,6 +882,27 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
                 createParticlePath: drawStar,
               ),
             ),
+            // DDots Overlay - stuck to bottom
+            if (_showDCardOverlay)
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _showDCardOverlay = false;
+                  });
+                },
+                child: Container(
+                  color: Colors.black.withOpacity(0.75),
+                  child: Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Image.asset(
+                      'assets/images/ddots.png',
+                      width: MediaQuery.of(context).size.width * 1.0,
+                      height: MediaQuery.of(context).size.height * 0.7,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),

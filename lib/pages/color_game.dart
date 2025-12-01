@@ -16,6 +16,7 @@ class _ColorFloodGameState extends State<ColorFloodGame>
   int gridSize = 4; // Starts 4x4
   int level = 1;
   int puzzlesSolved = 0;
+  bool _showDCardOverlay = true;
 
   // Game state variables for Color Flood
   late List<List<String>> grid;
@@ -172,7 +173,11 @@ class _ColorFloodGameState extends State<ColorFloodGame>
     colorMap = colorStyles[currentStyle];
 
     _generateRandomBoard();
-    _startGameTimer();
+    _gameTimer?.cancel();
+    // Only start timer if overlay is not showing
+    if (!_showDCardOverlay) {
+      _startGameTimer();
+    }
 
     if (mounted) {
       setState(() {});
@@ -466,7 +471,9 @@ class _ColorFloodGameState extends State<ColorFloodGame>
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context, false);
-              _startGameTimer(); // Resume timer
+              if (!_showDCardOverlay) {
+                _startGameTimer();
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.green,
@@ -749,6 +756,28 @@ class _ColorFloodGameState extends State<ColorFloodGame>
                 createParticlePath: drawStar,
               ),
             ),
+            // DColors Overlay - stuck to bottom
+            if (_showDCardOverlay)
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _showDCardOverlay = false;
+                  });
+                  _startGameTimer();
+                },
+                child: Container(
+                  color: Colors.black.withOpacity(0.75),
+                  child: Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Image.asset(
+                      'assets/images/dcolor.png',
+                      width: MediaQuery.of(context).size.width * 1.0,
+                      height: MediaQuery.of(context).size.height * 0.7,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),

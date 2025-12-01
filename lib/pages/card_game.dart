@@ -3,7 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:confetti/confetti.dart';
-import 'package:flip_card/flip_card.dart'; // Import the package
+import 'package:flip_card/flip_card.dart';
 
 class CardGame extends StatefulWidget {
   const CardGame({super.key});
@@ -20,14 +20,12 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
   int setsCompleted = 0;
   int timeRemaining = 30;
   Timer? _gameTimer;
+  bool _showDCardOverlay = true;
 
-  // Removed _flipController (handled by package)
   late AnimationController _matchController;
   late AudioPlayer _bgMusicPlayer;
 
-  // Master confetti controller for background effects
   late ConfettiController _confettiController;
-  // Specific controller for confetti that originates from the dialog itself
   late ConfettiController _dialogConfettiController;
 
   int _frogFrame = 0;
@@ -57,7 +55,6 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
     _confettiController = ConfettiController(
       duration: const Duration(seconds: 3),
     );
-    // Initialize dialog confetti controller as well
     _dialogConfettiController = ConfettiController(
       duration: const Duration(seconds: 1),
     );
@@ -76,7 +73,7 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
     _gameTimer?.cancel();
     _bgMusicPlayer.dispose();
     _confettiController.dispose();
-    _dialogConfettiController.dispose(); // Dispose dialog controller
+    _dialogConfettiController.dispose();
     super.dispose();
   }
 
@@ -99,10 +96,12 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
     timeRemaining = 30;
 
     _confettiController.stop();
-    _dialogConfettiController.stop(); // Stop dialog confetti on restart
+    _dialogConfettiController.stop();
 
     _gameTimer?.cancel();
-    _startGameTimer();
+    if (!_showDCardOverlay) {
+      _startGameTimer();
+    }
 
     _setupCards();
   }
@@ -156,7 +155,6 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
       return;
     }
 
-    // Trigger the package animation using the key
     cards[index].cardKey.currentState?.toggleCard();
 
     setState(() {
@@ -190,7 +188,6 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
           _onSetCompleted();
         }
       } else {
-        // No match: Flip them back using the keys
         cards[flippedCards[0]].cardKey.currentState?.toggleCard();
         cards[flippedCards[1]].cardKey.currentState?.toggleCard();
 
@@ -229,7 +226,9 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context, false);
-              _startGameTimer();
+              if (!_showDCardOverlay) {
+                _startGameTimer();
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.green,
@@ -263,7 +262,6 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
     }
   }
 
-  // --- DIALOG BUILDER WITH INTERNAL CONFETTI ---
   Widget _buildDialogContent(
     String title,
     String message,
@@ -272,8 +270,7 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
     return Dialog(
       backgroundColor: Colors.transparent,
       child: Stack(
-        // Use Stack to layer confetti over the dialog
-        alignment: Alignment.topCenter, // Confetti from the top of the dialog
+        alignment: Alignment.topCenter,
         children: [
           Container(
             width: 500,
@@ -315,21 +312,16 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
               ],
             ),
           ),
-          // Confetti for the dialog itself
           ConfettiWidget(
             confettiController: _dialogConfettiController,
-            blastDirection: pi / 2, // Downwards
-            maxBlastForce: 20, // Stronger blast for a pop
+            blastDirection: pi / 2,
+            maxBlastForce: 20,
             minBlastForce: 10,
-            emissionFrequency: 0.2, // Frequent bursts
-            numberOfParticles: 15, // A good amount
-            gravity: 0.5, // Fall a bit faster
+            emissionFrequency: 0.2,
+            numberOfParticles: 15,
+            gravity: 0.5,
             shouldLoop: false,
-            colors: const [
-              Colors.yellow,
-              Colors.lightGreen,
-              Colors.lightBlue,
-            ], // Brighter colors for dialog
+            colors: const [Colors.yellow, Colors.lightGreen, Colors.lightBlue],
             createParticlePath: drawStar,
           ),
         ],
@@ -339,7 +331,7 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
 
   void _showNextSetDialog() {
     _confettiController.play();
-    _dialogConfettiController.play(); // Play dialog confetti
+    _dialogConfettiController.play();
     _gameTimer?.cancel();
     showDialog(
       context: context,
@@ -389,7 +381,7 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
 
   void _showLevelUpDialog() {
     _confettiController.play();
-    _dialogConfettiController.play(); // Play dialog confetti
+    _dialogConfettiController.play();
     _gameTimer?.cancel();
     showDialog(
       context: context,
@@ -686,9 +678,6 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
               ),
             ),
 
-            // --- ALL CONFETTI CANNONS (Background) ---
-
-            // 1. Top Center
             Align(
               alignment: Alignment.topCenter,
               child: ConfettiWidget(
@@ -712,7 +701,6 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
               ),
             ),
 
-            // 2. Top Left
             Align(
               alignment: Alignment.topLeft,
               child: ConfettiWidget(
@@ -720,8 +708,8 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
                 blastDirection: pi / 3,
                 maxBlastForce: 10,
                 minBlastForce: 5,
-                emissionFrequency: 0.1, // Increased
-                numberOfParticles: 25, // Increased
+                emissionFrequency: 0.1,
+                numberOfParticles: 25,
                 gravity: 0.2,
                 colors: const [
                   Colors.green,
@@ -733,7 +721,6 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
               ),
             ),
 
-            // 3. Top Right
             Align(
               alignment: Alignment.topRight,
               child: ConfettiWidget(
@@ -741,8 +728,8 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
                 blastDirection: 2 * pi / 3,
                 maxBlastForce: 10,
                 minBlastForce: 5,
-                emissionFrequency: 0.1, // Increased
-                numberOfParticles: 25, // Increased
+                emissionFrequency: 0.1,
+                numberOfParticles: 25,
                 gravity: 0.2,
                 colors: const [
                   Colors.purple,
@@ -754,7 +741,6 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
               ),
             ),
 
-            // 4. Center Left (Shooting Right)
             Align(
               alignment: Alignment.centerLeft,
               child: ConfettiWidget(
@@ -762,15 +748,14 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
                 blastDirection: 0,
                 maxBlastForce: 15,
                 minBlastForce: 5,
-                emissionFrequency: 0.08, // Increased
-                numberOfParticles: 20, // Increased
+                emissionFrequency: 0.08,
+                numberOfParticles: 20,
                 gravity: 0.4,
                 colors: const [Colors.yellow, Colors.orange, Colors.red],
                 createParticlePath: drawStar,
               ),
             ),
 
-            // 5. Center Right (Shooting Left)
             Align(
               alignment: Alignment.centerRight,
               child: ConfettiWidget(
@@ -778,20 +763,19 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
                 blastDirection: pi,
                 maxBlastForce: 15,
                 minBlastForce: 5,
-                emissionFrequency: 0.08, // Increased
-                numberOfParticles: 20, // Increased
+                emissionFrequency: 0.08,
+                numberOfParticles: 20,
                 gravity: 0.4,
                 colors: const [Colors.blue, Colors.cyan, Colors.purple],
                 createParticlePath: drawStar,
               ),
             ),
 
-            // 6. NEW: Bottom Left (Shooting Up)
             Align(
               alignment: Alignment.bottomLeft,
               child: ConfettiWidget(
                 confettiController: _confettiController,
-                blastDirection: -pi / 4, // Up-Right diagonal
+                blastDirection: -pi / 4,
                 maxBlastForce: 10,
                 minBlastForce: 5,
                 emissionFrequency: 0.08,
@@ -802,12 +786,11 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
               ),
             ),
 
-            // 7. NEW: Bottom Right (Shooting Up)
             Align(
               alignment: Alignment.bottomRight,
               child: ConfettiWidget(
                 confettiController: _confettiController,
-                blastDirection: -3 * pi / 4, // Up-Left diagonal
+                blastDirection: -3 * pi / 4,
                 maxBlastForce: 10,
                 minBlastForce: 5,
                 emissionFrequency: 0.08,
@@ -821,6 +804,29 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
                 createParticlePath: drawStar,
               ),
             ),
+
+            // DCard Overlay - stuck to bottom
+            if (_showDCardOverlay)
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _showDCardOverlay = false;
+                  });
+                  _startGameTimer();
+                },
+                child: Container(
+                  color: Colors.black.withOpacity(0.80),
+                  child: Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Image.asset(
+                      'assets/images/dcard.png',
+                      width: MediaQuery.of(context).size.width * 1.0,
+                      height: MediaQuery.of(context).size.height * 0.7,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -869,19 +875,15 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
 
   Widget _buildGameCard(int index, double cardSize) {
     final card = cards[index];
-    // Replaced Manual animation with FlipCard
     return GestureDetector(
       onTap: () => _flipCard(index),
       child: FlipCard(
-        key: card.cardKey, // Use key for programmatic control
-        flipOnTouch: false, // We handle the flip via _flipCard
+        key: card.cardKey,
+        flipOnTouch: false,
         direction: FlipDirection.HORIZONTAL,
         side: CardSide.FRONT,
-        front: _buildCardBack(cardSize), // "Front" is the Pad (hidden state)
-        back: _buildCardFront(
-          card,
-          cardSize,
-        ), // "Back" is the Animal (revealed state)
+        front: _buildCardBack(cardSize),
+        back: _buildCardFront(card, cardSize),
       ),
     );
   }
@@ -956,7 +958,6 @@ class GameCard {
   bool isFlipped;
   bool isMatched;
 
-  // Added key for flip control
   final GlobalKey<FlipCardState> cardKey = GlobalKey<FlipCardState>();
 
   GameCard({
