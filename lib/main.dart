@@ -51,7 +51,7 @@ class _IntroVideoPageState extends State<IntroVideoPage> {
 
   Future<void> _initializeVideo() async {
     // Load video from assets
-    _controller = VideoPlayerController.asset('assets/videos/1201.mp4');
+    _controller = VideoPlayerController.asset('assets/videos/new_intro.mp4');
 
     await _controller.initialize();
     setState(() {
