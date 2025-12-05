@@ -7,7 +7,7 @@ import 'animal_sounds.dart';
 import 'landing_page.dart';
 import "guess_animal.dart";
 import 'color_game.dart';
-// import 'puzzle_menu.dart'; // Duplicate import removed
+import 'background_music_manager.dart'; // <--- NEW IMPORT
 
 class GamesMenu extends StatefulWidget {
   const GamesMenu({super.key});
@@ -19,6 +19,8 @@ class GamesMenu extends StatefulWidget {
 class _GamesMenuState extends State<GamesMenu> {
   late PageController _pageController;
   double currentPage = 0;
+  final BackgroundMusicManager _musicManager =
+      BackgroundMusicManager(); // <--- MANAGER INSTANCE
 
   // 1. Define a large number for "infinite" feeling
   final int _infinitePageCount = 100000;
@@ -39,8 +41,6 @@ class _GamesMenuState extends State<GamesMenu> {
     super.initState();
 
     // 2. Calculate the middle index
-    // We want a starting index that is in the middle of _infinitePageCount
-    // AND ensures that (index % length) == 0, so we start on the first image.
     _initialPage = (_infinitePageCount / 2).round();
     final int remainder = _initialPage % gameImages.length;
     if (remainder != 0) {
@@ -69,43 +69,39 @@ class _GamesMenuState extends State<GamesMenu> {
     super.dispose();
   }
 
-  void _handleGameTap(String image) {
+  void _handleGameTap(String image) async {
+    // <--- MADE ASYNC
+    // 1. Define the page to navigate to
+    Widget page;
     if (image.contains('flip_a_card')) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const CardGame()),
-      );
+      page = const CardGame();
     } else if (image.contains('fruits_basket')) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const FruitGame()),
-      );
+      page = const FruitGame();
     } else if (image.contains('connect_the_dots')) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const ConnectDotsGame()),
-      );
+      page = const ConnectDotsGame();
     } else if (image.contains('guess_the_animal')) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const GuessAnimalGame()),
-      );
+      page = const GuessAnimalGame();
     } else if (image.contains('animal_sounds')) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const AnimalSoundsQuiz()),
-      );
+      page = const AnimalSoundsQuiz();
     } else if (image.contains('color_fill')) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const ColorFloodGame()),
-      );
+      page = const ColorFloodGame();
     } else if (image.contains('puzzle_piece')) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const PuzzleMenu()),
-      );
+      page = const PuzzleMenu();
+    } else {
+      return; // Safety break
     }
+
+    // 2. Pause music before pushing the game page (optional, but standard for focused gameplay)
+    _musicManager.pauseMusic();
+
+    // 3. Navigate and WAIT for the game page to be popped
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => page),
+    );
+
+    // 4. Resume music when returning to GamesMenu
+    _musicManager.resumeMusic();
   }
 
   @override
@@ -151,14 +147,6 @@ class _GamesMenuState extends State<GamesMenu> {
                           ),
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(20),
-                            // Optional: Add a shadow to make them pop more
-                            // boxShadow: [
-                            // BoxShadow(
-                            // color: Colors.black.withOpacity(0.2),
-                            //blurRadius: 10,
-                            //offset: const Offset(0, 5),
-                            // ),
-                            // ],
                           ),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(20),
@@ -185,6 +173,7 @@ class _GamesMenuState extends State<GamesMenu> {
               child: InkWell(
                 borderRadius: BorderRadius.circular(50),
                 onTap: () {
+                  // Uses pushReplacement to return to LandingPage and dispose of GamesMenu
                   Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:newt_2/pages/storybooks.dart';
 import 'games_menu.dart';
-import 'package:audioplayers/audioplayers.dart';
 import 'package:zoom_tap_animation/zoom_tap_animation.dart';
+import 'background_music_manager.dart'; // <--- NEW IMPORT
 
 class LandingPage extends StatefulWidget {
   const LandingPage({super.key});
@@ -12,9 +12,11 @@ class LandingPage extends StatefulWidget {
 }
 
 class _LandingPageState extends State<LandingPage> {
-  final AudioPlayer _audioPlayer = AudioPlayer(); // For Music
+  // Use the global music manager instead of a local AudioPlayer
+  final BackgroundMusicManager _musicManager = BackgroundMusicManager();
 
-  bool _isPlaying = true;
+  // Initialize with the current global state of the music manager
+  late bool _isPlaying;
   double _swayValue = -0.1;
   bool _bounceUp = true;
 
@@ -24,6 +26,8 @@ class _LandingPageState extends State<LandingPage> {
     _playMusic();
     _startSwaying();
     _startBouncing();
+    // Initialize local state based on manager's current state
+    _isPlaying = _musicManager.isPlaying;
   }
 
   void _startBouncing() {
@@ -53,43 +57,41 @@ class _LandingPageState extends State<LandingPage> {
   }
 
   void _playMusic() async {
-    await _audioPlayer.setReleaseMode(ReleaseMode.loop);
-    await _audioPlayer.play(AssetSource('sounds/card.mp3'));
-  }
-
-  void _toggleSound() {
+    // Starts music if not already running
+    await _musicManager.startMusic();
+    // Update local state for UI icon
     setState(() {
-      if (_isPlaying) {
-        _audioPlayer.pause();
-        _isPlaying = false;
-      } else {
-        _audioPlayer.resume();
-        _isPlaying = true;
-      }
+      _isPlaying = _musicManager.isPlaying;
     });
   }
 
+  void _toggleSound() async {
+    // Toggles music and updates local state
+    await _musicManager.toggleSound();
+    setState(() {
+      _isPlaying = _musicManager.isPlaying;
+    });
+  }
+
+  // Navigation functions no longer need pause/resume because the music
+  // is now managed by the global manager and persists.
   void _navigateToGames() async {
-    if (_isPlaying) _audioPlayer.pause();
     await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const GamesMenu()),
     );
-    if (_isPlaying) _audioPlayer.resume();
   }
 
   void _navigateToStorybooks() async {
-    if (_isPlaying) _audioPlayer.pause();
     await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const StoryBooksPage()),
     );
-    if (_isPlaying) _audioPlayer.resume();
   }
 
   @override
   void dispose() {
-    _audioPlayer.dispose();
+    // DO NOT DISPOSE THE AUDIO PLAYER HERE. The manager holds it.
     super.dispose();
   }
 

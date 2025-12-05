@@ -5,27 +5,67 @@ import '3the_rainbow_bridge.dart';
 import '4the_helpful_wind.dart';
 import '5the_little_seeds_journey.dart';
 import 'landing_page.dart';
+import 'background_music_manager.dart';
 
-class StoryBooksPage extends StatelessWidget {
+// Changed to Stateful to allow for async navigation logic
+class StoryBooksPage extends StatefulWidget {
   const StoryBooksPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final List<String> stories = [
-      'assets/images/story1.png',
-      'assets/images/story2.png',
-      'assets/images/story3.png',
-      'assets/images/story4.png',
-      'assets/images/story5.png',
-    ];
+  State<StoryBooksPage> createState() => _StoryBooksPageState();
+}
 
+class _StoryBooksPageState extends State<StoryBooksPage> {
+  final BackgroundMusicManager _musicManager =
+      BackgroundMusicManager(); // <--- MANAGER INSTANCE
+
+  final List<String> stories = const [
+    'assets/images/story1.png',
+    'assets/images/story2.png',
+    'assets/images/story3.png',
+    'assets/images/story4.png',
+    'assets/images/story5.png',
+  ];
+
+  // New asynchronous handler for navigation
+  void _navigateToStory(int index) async {
+    Widget? page;
+
+    if (index == 0) {
+      page = const StoryBookPage1();
+    } else if (index == 1) {
+      page = const StoryBookPage2();
+    } else if (index == 2) {
+      page = const StoryBookPage3();
+    } else if (index == 3) {
+      page = const StoryBookPage4();
+    } else if (index == 4) {
+      page = const StoryBookPage5();
+    }
+
+    if (page != null) {
+      // 1. Pause music before pushing the story page
+      _musicManager.pauseMusic();
+
+      // 2. Navigate and WAIT for the story page to be popped
+      await Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (context) => page!));
+
+      // 3. Resume music when returning to StoryBooksPage
+      _musicManager.resumeMusic();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       body: Stack(
         children: [
           // 🖼 Background
           Positioned.fill(
             child: Opacity(
-              opacity: 0.8, // 👈 80% visible
+              opacity: 0.8,
               child: Image.asset(
                 'assets/images/landingv2.png',
                 fit: BoxFit.cover,
@@ -46,27 +86,8 @@ class StoryBooksPage extends StatelessWidget {
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 15),
                     child: GestureDetector(
-                      onTap: () {
-                        Widget? page;
-
-                        if (index == 0) {
-                          page = const StoryBookPage1();
-                        } else if (index == 1) {
-                          page = const StoryBookPage2();
-                        } else if (index == 2) {
-                          page = const StoryBookPage3();
-                        } else if (index == 3) {
-                          page = const StoryBookPage4();
-                        } else if (index == 4) {
-                          page = const StoryBookPage5();
-                        }
-
-                        if (page != null) {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(builder: (context) => page!),
-                          );
-                        }
-                      },
+                      // Use the new handler
+                      onTap: () => _navigateToStory(index),
                       child: Image.asset(
                         path,
                         width: 280,
@@ -85,8 +106,7 @@ class StoryBooksPage extends StatelessWidget {
             top: 40,
             left: 20,
             child: GestureDetector(
-              behavior:
-                  HitTestBehavior.opaque, // ✅ ensures tap always registers
+              behavior: HitTestBehavior.opaque,
               onTap: () {
                 Navigator.pushReplacement(
                   context,
