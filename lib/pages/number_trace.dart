@@ -1,10 +1,133 @@
 import 'dart:async';
 import 'dart:math';
+import 'dart:ui'; // Required for PathMetric
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:video_player/video_player.dart';
-import 'package:confetti/confetti.dart'; // Import Confetti
+import 'package:confetti/confetti.dart';
 
+// --- 1. NUMBER PATH DEFINITIONS (Optimized for Bezier Smoothing) ---
+class NumberTraceDefinition {
+  final int number;
+  final List<List<Offset>> segments; // Segments 0-1000
+
+  NumberTraceDefinition(this.number, this.segments);
+
+  static final Map<int, NumberTraceDefinition> definitions = {
+    // 0: Oval - Points define the perimeter
+    0: NumberTraceDefinition(0, [
+      [
+        const Offset(500, 100), // Top Center
+        const Offset(200, 100), // Top Left Corner (Control)
+        const Offset(200, 500), // Left Middle
+        const Offset(200, 900), // Bottom Left Corner (Control)
+        const Offset(500, 900), // Bottom Center
+        const Offset(800, 900), // Bottom Right Corner (Control)
+        const Offset(800, 500), // Right Middle
+        const Offset(800, 100), // Top Right Corner (Control)
+        const Offset(500, 100), // Close Loop
+      ],
+    ]),
+    // 1: Nose then Vertical
+    1: NumberTraceDefinition(1, [
+      [
+        const Offset(300, 300),
+        const Offset(500, 100),
+      ], // Stroke 1: Nose (Straight)
+      [
+        const Offset(500, 100),
+        const Offset(500, 900),
+      ], // Stroke 2: Vertical (Straight)
+    ]),
+    // 2: Curve + Diagonal + Base
+    2: NumberTraceDefinition(2, [
+      [
+        const Offset(250, 300), // Start Hook
+        const Offset(300, 100), // Top Arch
+        const Offset(700, 100), // Top Arch Right
+        const Offset(750, 350), // Shoulder
+        const Offset(250, 900), // Diagonal Target
+      ],
+      [const Offset(250, 900), const Offset(800, 900)], // Base (Straight)
+    ]),
+    // 3: Two stacked curves
+    3: NumberTraceDefinition(3, [
+      [
+        const Offset(280, 220),
+        const Offset(750, 200), // Top Arch
+        const Offset(550, 480), // Middle In
+        const Offset(500, 500), // Center Point
+      ],
+      [
+        const Offset(500, 500),
+        const Offset(750, 550), // Bottom Arch Out
+        const Offset(750, 850), // Bottom Arch Down
+        const Offset(280, 850), // Bottom Hook
+      ],
+    ]),
+    // 4: Open 4 style
+    4: NumberTraceDefinition(4, [
+      [const Offset(650, 100), const Offset(200, 650)], // Diagonal
+      [const Offset(200, 650), const Offset(850, 650)], // Horizontal
+      [const Offset(650, 350), const Offset(650, 900)], // Vertical Cross
+    ]),
+    // 5: Vertical -> Belly -> Top
+    5: NumberTraceDefinition(5, [
+      [const Offset(280, 180), const Offset(280, 450)], // Vertical Down
+      [
+        const Offset(280, 450), // Belly Start
+        const Offset(750, 450), // Belly Out
+        const Offset(750, 880), // Belly Down
+        const Offset(300, 880), // Belly Hook
+      ],
+      [const Offset(280, 180), const Offset(800, 180)], // Top Hat
+    ]),
+    // 6: C curve -> Loop
+    6: NumberTraceDefinition(6, [
+      [
+        const Offset(650, 100), // Top Start
+        const Offset(200, 500), // Back curve
+        const Offset(200, 900), // Bottom curve
+        const Offset(650, 900), // Bottom Right
+        const Offset(650, 550), // Loop Top
+        const Offset(200, 600), // Loop Tuck
+      ],
+    ]),
+    // 7: Horizontal -> Diagonal
+    7: NumberTraceDefinition(7, [
+      [const Offset(200, 100), const Offset(800, 100)],
+      [const Offset(800, 100), const Offset(400, 900)],
+    ]),
+    // 8: S-Curve Snake
+    8: NumberTraceDefinition(8, [
+      [
+        const Offset(500, 100), // Start Top
+        const Offset(200, 250), // Top Left
+        const Offset(500, 500), // Cross
+        const Offset(800, 750), // Bottom Right
+        const Offset(500, 900), // Bottom
+        const Offset(200, 750), // Bottom Left
+        const Offset(500, 500), // Cross
+        const Offset(800, 250), // Top Right
+        const Offset(500, 100), // Close
+      ],
+    ]),
+    // 9: Circle -> Vertical Tail
+    9: NumberTraceDefinition(9, [
+      [
+        const Offset(750, 400), // Start Side
+        const Offset(500, 100), // Top
+        const Offset(250, 400), // Left
+        const Offset(500, 650), // Bottom
+        const Offset(750, 400), // Close
+      ],
+      [const Offset(750, 400), const Offset(500, 900)], // Tail
+    ]),
+  };
+}
+
+// --- 2. MAIN GAME WIDGET ---
 class NumberPathGame extends StatefulWidget {
   const NumberPathGame({super.key});
 
@@ -14,62 +137,47 @@ class NumberPathGame extends StatefulWidget {
 
 class _NumberPathGameState extends State<NumberPathGame>
     with TickerProviderStateMixin {
-  int gridSize = 3; // Start with 3x3
-  int level = 1;
-  int puzzlesSolved = 0;
+  // Game State
+  int currentNumber = 0;
+  List<Offset> userTracePath = [];
+  List<List<Offset>> targetSegments = [];
+  int currentSegmentIndex = 0;
+  int currentSegmentPointIndex = 0;
 
-  late List<List<int?>> grid;
-  List<Offset> currentPath = [];
-  Offset? startPos;
-  Offset? endPos;
+  // Validation
+  final double validationThreshold = 95.0; // Extremely forgiving
+  final double startRadiusNormalized = 180.0; // Huge hit area
+
+  bool isTracing = false;
   bool gameComplete = false;
 
+  // UI State
+  int level = 1;
+  int puzzlesSolved = 0;
   int _mascotFrame = 0;
   Timer? _mascotTimer;
-
-  late AnimationController _winController;
-  late AudioPlayer _bgMusicPlayer;
-
-  // --- NEW: Confetti Controllers ---
   late ConfettiController _bgConfettiController;
   late ConfettiController _dialogConfettiController;
-
-  // Number range for each level
-  int maxNumber = 5;
-
-  // Timer variables
   Timer? _gameTimer;
   int _timeRemaining = 30;
-  bool _isTimerRunning = false;
 
   @override
   void initState() {
     super.initState();
-
-    // Initialize Confetti
     _bgConfettiController = ConfettiController(
       duration: const Duration(seconds: 3),
     );
     _dialogConfettiController = ConfettiController(
       duration: const Duration(seconds: 1),
     );
-
     _initializeGame();
     _startMascotAnimation();
-    _bgMusicPlayer = AudioPlayer();
-    _playBackgroundMusic();
-    _winController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 1),
-    );
   }
 
   @override
   void dispose() {
     _mascotTimer?.cancel();
     _gameTimer?.cancel();
-    _winController.dispose();
-    _bgMusicPlayer.dispose();
     _bgConfettiController.dispose();
     _dialogConfettiController.dispose();
     super.dispose();
@@ -77,32 +185,24 @@ class _NumberPathGameState extends State<NumberPathGame>
 
   void _startMascotAnimation() {
     _mascotTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
-      if (mounted) {
-        setState(() {
-          _mascotFrame = (_mascotFrame + 1) % 3;
-        });
-      }
+      if (mounted) setState(() => _mascotFrame = (_mascotFrame + 1) % 3);
     });
   }
 
-  // --- STAR SHAPE FOR CONFETTI ---
   Path drawStar(Size size) {
     double cx = size.width / 2;
     double cy = size.height / 2;
     double outerRadius = size.width / 2;
     double innerRadius = size.width / 5;
-
     Path path = Path();
     double rot = pi / 2 * 3;
     double step = pi / 5;
-
     path.moveTo(cx, cy - outerRadius);
     for (int i = 0; i < 5; i++) {
       double x = cx + cos(rot) * outerRadius;
       double y = cy + sin(rot) * outerRadius;
       path.lineTo(x, y);
       rot += step;
-
       x = cx + cos(rot) * innerRadius;
       y = cy + sin(rot) * innerRadius;
       path.lineTo(x, y);
@@ -113,259 +213,199 @@ class _NumberPathGameState extends State<NumberPathGame>
   }
 
   void _updateDifficultyForLevel() {
-    if (level == 1) {
-      gridSize = 3;
-      maxNumber = 5;
-    } else if (level == 2) {
-      gridSize = 3;
-      maxNumber = 9;
-    } else if (level == 3) {
-      gridSize = 4;
-      maxNumber = 9;
-    } else if (level == 4) {
-      gridSize = 4;
-      maxNumber = 12;
-    } else if (level == 5) {
-      gridSize = 4;
-      maxNumber = 15;
-    } else {
-      gridSize = 4;
-      maxNumber = 20;
-    }
-  }
-
-  String _getLevelDescription() {
-    switch (level) {
-      case 1:
-        return "3×3 Grid - Numbers 1-5";
-      case 2:
-        return "3×3 Grid - Numbers 1-9";
-      case 3:
-        return "4×4 Grid - Numbers 1-9";
-      case 4:
-        return "4×4 Grid - Numbers 1-12";
-      case 5:
-        return "4×4 Grid - Numbers 1-15";
-      default:
-        return "4×4 Grid - Numbers 1-20";
-    }
+    currentNumber = (level - 1) % 10;
   }
 
   void _initializeGame() {
     gameComplete = false;
-    currentPath.clear();
+    userTracePath.clear();
+    currentSegmentIndex = 0;
+    currentSegmentPointIndex = 0;
     _bgConfettiController.stop();
     _dialogConfettiController.stop();
     _updateDifficultyForLevel();
-    _generatePuzzle();
+    _prepareTracingNumber(currentNumber);
     _startTimer();
+    if (mounted) setState(() {});
+  }
 
-    if (mounted) {
-      setState(() {});
+  void _prepareTracingNumber(int number) {
+    final definition =
+        NumberTraceDefinition.definitions[number] ??
+        NumberTraceDefinition.definitions[0]!;
+    targetSegments = definition.segments;
+    userTracePath.clear();
+    currentSegmentIndex = 0;
+    currentSegmentPointIndex = 0;
+  }
+
+  // --- TOUCH HANDLERS ---
+
+  void _handlePanStart(DragStartDetails details, BoxConstraints constraints) {
+    if (gameComplete) return;
+
+    final localPos = details.localPosition;
+    final scale = constraints.maxWidth / 1000.0;
+
+    if (targetSegments.isEmpty) return;
+    if (currentSegmentIndex >= targetSegments.length) return;
+
+    final startPointNormalized = targetSegments[currentSegmentIndex][0];
+    final startPointScaled = Offset(
+      startPointNormalized.dx * scale,
+      startPointNormalized.dy * scale,
+    );
+
+    final distance = (localPos - startPointScaled).distance;
+
+    if (distance < startRadiusNormalized * scale) {
+      isTracing = true;
+      if (currentSegmentIndex == 0) {
+        userTracePath = [localPos];
+      } else {
+        userTracePath.add(localPos);
+      }
+      currentSegmentPointIndex = 1;
+      HapticFeedback.lightImpact();
+      if (mounted) setState(() {});
     }
+  }
+
+  void _handlePanUpdate(DragUpdateDetails details, BoxConstraints constraints) {
+    if (!isTracing || gameComplete) return;
+
+    final localPos = details.localPosition;
+    userTracePath.add(localPos);
+
+    final scale = constraints.maxWidth / 1000.0;
+    final normalizedPos = localPos / scale;
+
+    if (currentSegmentIndex < targetSegments.length) {
+      final currentSegment = targetSegments[currentSegmentIndex];
+
+      // For hit testing, we use the raw points, but visually we show curves.
+      // Since validationThreshold is high (95.0), this approximation works well for kids.
+      if (currentSegmentPointIndex < currentSegment.length) {
+        final targetPoint = currentSegment[currentSegmentPointIndex];
+        final distance = (normalizedPos - targetPoint).distance;
+
+        if (distance < validationThreshold) {
+          currentSegmentPointIndex++;
+          // Minimal feedback to keep it smooth
+          if (currentSegmentPointIndex % 2 == 0)
+            HapticFeedback.selectionClick();
+
+          if (currentSegmentPointIndex >= currentSegment.length) {
+            currentSegmentIndex++;
+            currentSegmentPointIndex = 0;
+            HapticFeedback.mediumImpact();
+
+            if (currentSegmentIndex >= targetSegments.length) {
+              _onPuzzleComplete();
+            }
+          }
+        }
+      }
+    }
+    if (mounted) setState(() {});
+  }
+
+  void _handlePanEnd(DragEndDetails details, BoxConstraints constraints) {
+    isTracing = false;
+    if (mounted) setState(() {});
   }
 
   void _startTimer() {
     _gameTimer?.cancel();
     _timeRemaining = 30;
-    _isTimerRunning = true;
-
     _gameTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) {
         timer.cancel();
         return;
       }
-
       setState(() {
-        if (_timeRemaining > 0 && !gameComplete) {
+        if (_timeRemaining > 0 && !gameComplete)
           _timeRemaining--;
-        } else if (_timeRemaining == 0 && !gameComplete) {
+        else if (_timeRemaining == 0 && !gameComplete)
           _onTimeUp();
-        }
       });
     });
-  }
-
-  void _stopTimer() {
-    _gameTimer?.cancel();
-    _isTimerRunning = false;
-  }
-
-  Future<void> _playBackgroundMusic() async {
-    await _bgMusicPlayer.setReleaseMode(ReleaseMode.loop);
-    await _bgMusicPlayer.play(AssetSource('sounds/dots.mp3'));
-  }
-
-  void _generatePuzzle() {
-    final rand = Random();
-    grid = List.generate(gridSize, (_) => List.filled(gridSize, null));
-
-    // Place START at random position
-    int startX = rand.nextInt(gridSize);
-    int startY = rand.nextInt(gridSize);
-    startPos = Offset(startX.toDouble(), startY.toDouble());
-
-    // Place END at a different position
-    int endX, endY;
-    do {
-      endX = rand.nextInt(gridSize);
-      endY = rand.nextInt(gridSize);
-    } while (endX == startX && endY == startY);
-
-    endPos = Offset(endX.toDouble(), endY.toDouble());
-
-    // Create a simple guaranteed solvable path
-    List<Offset> solutionPath = _createSimplePath(startPos!, endPos!);
-
-    // Assign ascending numbers to the path
-    for (int i = 0; i < solutionPath.length; i++) {
-      Offset pos = solutionPath[i];
-      grid[pos.dy.toInt()][pos.dx.toInt()] = i + 1;
-    }
-
-    // Fill remaining cells with random numbers
-    for (int y = 0; y < gridSize; y++) {
-      for (int x = 0; x < gridSize; x++) {
-        if (grid[y][x] == null) {
-          grid[y][x] = 1 + rand.nextInt(maxNumber);
-        }
-      }
-    }
-  }
-
-  List<Offset> _createSimplePath(Offset start, Offset end) {
-    List<Offset> path = [start];
-    Offset current = start;
-
-    // Move horizontally first
-    while (current.dx != end.dx) {
-      if (current.dx < end.dx) {
-        current = Offset(current.dx + 1, current.dy);
-      } else {
-        current = Offset(current.dx - 1, current.dy);
-      }
-      path.add(current);
-    }
-
-    // Then move vertically
-    while (current.dy != end.dy) {
-      if (current.dy < end.dy) {
-        current = Offset(current.dx, current.dy + 1);
-      } else {
-        current = Offset(current.dx, current.dy - 1);
-      }
-      path.add(current);
-    }
-
-    return path;
-  }
-
-  void _handleCellTouch(Offset cellPos) {
-    if (gameComplete) return;
-
-    int x = cellPos.dx.toInt();
-    int y = cellPos.dy.toInt();
-
-    // Starting a new path
-    if (currentPath.isEmpty) {
-      if (cellPos == startPos) {
-        currentPath.add(cellPos);
-        setState(() {});
-      }
-      return;
-    }
-
-    // Check if this is the same cell (ignore)
-    if (currentPath.last == cellPos) return;
-
-    // Check if move is adjacent
-    final last = currentPath.last;
-    bool isAdjacent =
-        (cellPos.dx - last.dx).abs() + (cellPos.dy - last.dy).abs() == 1;
-
-    if (!isAdjacent) return;
-
-    // Check if backtracking
-    if (currentPath.length > 1 &&
-        currentPath[currentPath.length - 2] == cellPos) {
-      currentPath.removeLast();
-      setState(() {});
-      return;
-    }
-
-    // Check if we can move to this cell
-    if (_canMoveToCell(cellPos)) {
-      currentPath.add(cellPos);
-
-      // Check if we reached the end
-      if (cellPos == endPos) {
-        _onPuzzleComplete();
-      }
-
-      setState(() {});
-    }
-  }
-
-  void _handleDragEnd() {
-    if (gameComplete) return;
-
-    // If path doesn't reach the end, clear it
-    if (currentPath.isEmpty || currentPath.last != endPos) {
-      currentPath.clear();
-      setState(() {});
-    }
-  }
-
-  bool _canMoveToCell(Offset pos) {
-    int x = pos.dx.toInt();
-    int y = pos.dy.toInt();
-
-    // Can't move to a cell already in path (except backtracking)
-    if (currentPath.contains(pos)) return false;
-
-    int? currentValue =
-        grid[currentPath.last.dy.toInt()][currentPath.last.dx.toInt()];
-    int? nextValue = grid[y][x];
-
-    if (currentValue == null || nextValue == null) return false;
-    if (pos == endPos) return true;
-    return nextValue >= currentValue;
   }
 
   void _onPuzzleComplete() {
     if (gameComplete) return;
     gameComplete = true;
     puzzlesSolved++;
+    bool levelUp = false;
+    String msg = '';
 
-    bool shouldLevelUp = false;
-    String levelUpMessage = '';
-    bool gridSizeChanged = false;
-
-    if (puzzlesSolved >= 2 && level < 6) {
-      int oldGridSize = gridSize;
-      level++;
-      shouldLevelUp = true;
-      levelUpMessage = 'Level $level: ${_getLevelDescription()}';
-      puzzlesSolved = 0;
-      _updateDifficultyForLevel();
-
-      if (oldGridSize != gridSize) {
-        gridSizeChanged = true;
+    if (puzzlesSolved >= 1) {
+      if (level < 10) {
+        level++;
+        levelUp = true;
+        msg = 'Great job! Moving to Number ${(level - 1) % 10}';
+        _updateDifficultyForLevel();
+      } else {
+        level = 1;
+        levelUp = true;
+        msg =
+            'Excellent! You finished all numbers! Restarting. Want to try again?';
+        _updateDifficultyForLevel();
       }
+      puzzlesSolved = 0;
     }
 
-    if (shouldLevelUp) {
-      _showLevelUpDialog(levelUpMessage, gridSizeChanged);
-    } else {
+    if (levelUp)
+      _showLevelUpDialog(msg);
+    else
       _showWinDialog();
-    }
+
+    setState(() {});
   }
 
-  // --- SHARED DIALOG BUILDER (STANDARD STYLE) ---
-  Widget _buildDialogContent(
+  // --- DIALOGS ---
+  void _showWinDialog() {
+    _bgConfettiController.play();
+    _dialogConfettiController.play();
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (c) => _buildDialog('Awesome!', 'You did it!', 'Next', () {
+        Navigator.pop(c);
+        _initializeGame();
+      }),
+    );
+  }
+
+  void _showLevelUpDialog(String msg) {
+    _bgConfettiController.play();
+    _dialogConfettiController.play();
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (c) => _buildDialog('Level Up!', msg, 'Start', () {
+        Navigator.pop(c);
+        _initializeGame();
+      }),
+    );
+  }
+
+  void _onTimeUp() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (c) => _buildDialog('Time Up!', 'Try again?', 'Retry', () {
+        Navigator.pop(c);
+        _initializeGame();
+      }),
+    );
+  }
+
+  Widget _buildDialog(
     String title,
-    String message,
-    List<Widget> actions,
+    String msg,
+    String btnText,
+    VoidCallback onBtn,
   ) {
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -373,55 +413,49 @@ class _NumberPathGameState extends State<NumberPathGame>
         alignment: Alignment.topCenter,
         children: [
           Container(
-            width: 500,
+            width: 400,
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.green.shade800, width: 4),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.3),
-                  blurRadius: 15,
-                  offset: const Offset(0, 8),
-                ),
-              ],
+              border: Border.all(color: Colors.green, width: 4),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   title,
-                  textAlign: TextAlign.center,
                   style: const TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 10),
                 Text(
-                  message,
+                  msg,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 20),
+                  style: const TextStyle(fontSize: 18),
                 ),
-                const SizedBox(height: 30),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: actions,
+                const SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: onBtn,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 30,
+                      vertical: 15,
+                    ),
+                  ),
+                  child: Text(btnText),
                 ),
               ],
             ),
           ),
           ConfettiWidget(
             confettiController: _dialogConfettiController,
-            blastDirection: pi / 2,
-            maxBlastForce: 20,
-            minBlastForce: 10,
+            blastDirection: -pi / 2,
             emissionFrequency: 0.2,
-            numberOfParticles: 15,
-            gravity: 0.5,
-            shouldLoop: false,
-            colors: const [Colors.yellow, Colors.lightGreen, Colors.lightBlue],
+            numberOfParticles: 10,
             createParticlePath: drawStar,
           ),
         ],
@@ -429,205 +463,22 @@ class _NumberPathGameState extends State<NumberPathGame>
     );
   }
 
-  // --- UPDATED DIALOGS ---
-
-  void _onTimeUp() {
-    _stopTimer();
-    gameComplete = true;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => _buildDialogContent(
-        '⏳ Time\'s Up!',
-        'You ran out of time. Don\'t give up!',
-        [
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.pop(context);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: const Text('Back to Menu', style: TextStyle(fontSize: 16)),
-          ),
-          const SizedBox(width: 20),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _initializeGame();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
-              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: const Text('Try Again', style: TextStyle(fontSize: 16)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showWinDialog() {
-    _bgConfettiController.play();
-    _dialogConfettiController.play();
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => _buildDialogContent(
-        '🎉 Excellent!',
-        'You found the path! Puzzle $puzzlesSolved/2',
-        [
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.pop(context);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: const Text('Back to Menu', style: TextStyle(fontSize: 16)),
-          ),
-          const SizedBox(width: 20),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _initializeGame();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
-              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: const Text('Next Puzzle', style: TextStyle(fontSize: 16)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showLevelUpDialog(String message, bool gridSizeChanged) {
-    _bgConfettiController.play();
-    _dialogConfettiController.play();
-
-    if (gridSizeChanged) {
-      gameComplete = false;
-      currentPath.clear();
-      _generatePuzzle();
-      _startTimer();
-      setState(() {});
-    }
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) =>
-          _buildDialogContent('⭐ Level Up!', 'Amazing work! $message', [
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                if (!gridSizeChanged) {
-                  _initializeGame();
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 30,
-                  vertical: 15,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text('Start Level', style: TextStyle(fontSize: 16)),
-            ),
-          ]),
-    );
-  }
-
-  // --- NAVIGATION SAFETY ---
   Future<void> _onBackButtonPressed() async {
-    _stopTimer();
-    bool? shouldExit = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => _buildDialogContent(
-        '🚪 Leaving already?',
-        'Your current progress will be lost!',
-        [
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context, false);
-              _startTimer(); // Resume timer
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: const Text('Stay & Play', style: TextStyle(fontSize: 16)),
-          ),
-          const SizedBox(width: 20),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context, true);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: const Text('Exit Game', style: TextStyle(fontSize: 16)),
-          ),
-        ],
-      ),
-    );
-
-    if (shouldExit == true && mounted) {
-      Navigator.of(context).pop();
-    }
-  }
-
-  void _resetProgress() {
-    setState(() {
-      level = 1;
-      puzzlesSolved = 0;
-      _updateDifficultyForLevel();
-      _initializeGame();
-    });
+    Navigator.of(context).pop();
   }
 
   @override
   Widget build(BuildContext context) {
     return PopScope(
       canPop: false,
-      onPopInvokedWithResult: (didPop, result) {
+      onPopInvoked: (didPop) {
         if (didPop) return;
         _onBackButtonPressed();
       },
       child: Scaffold(
         body: Stack(
           children: [
+            // 1. BACKGROUND LAYER
             Container(
               decoration: const BoxDecoration(
                 image: DecorationImage(
@@ -645,7 +496,7 @@ class _NumberPathGameState extends State<NumberPathGame>
                 child: SafeArea(
                   child: Row(
                     children: [
-                      // Left mascot
+                      // LEFT MASCOT
                       Expanded(
                         child: Container(
                           padding: const EdgeInsets.all(20),
@@ -659,9 +510,7 @@ class _NumberPathGameState extends State<NumberPathGame>
                                     duration: const Duration(milliseconds: 500),
                                     curve: Curves.easeInOut,
                                     transform: Matrix4.translationValues(
-                                      gridSize >= 6
-                                          ? -1
-                                          : (gridSize >= 5 ? 10 : 50),
+                                      50,
                                       20,
                                       0,
                                     ),
@@ -682,40 +531,58 @@ class _NumberPathGameState extends State<NumberPathGame>
                           ),
                         ),
                       ),
-                      // Game grid
+                      // CENTER GAME AREA (BUBBLE NUMBER)
                       Expanded(
                         flex: 2,
-                        child: Center(
-                          child: AspectRatio(
-                            aspectRatio: 1,
-                            child: LayoutBuilder(
-                              builder: (context, constraints) {
-                                final cellSize =
-                                    constraints.maxWidth / gridSize;
-                                return Container(
-                                  padding: EdgeInsets.all(
-                                    constraints.maxWidth * 0.02,
-                                  ),
-                                  child: NumberGameGrid(
-                                    key: ValueKey(
-                                      'grid-$gridSize-$level-$puzzlesSolved',
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 60.0),
+                          child: Center(
+                            child: AspectRatio(
+                              aspectRatio: 1,
+                              child: LayoutBuilder(
+                                builder: (context, constraints) {
+                                  return Container(
+                                    padding: EdgeInsets.all(
+                                      constraints.maxWidth * 0.02,
                                     ),
-                                    grid: grid,
-                                    gridSize: gridSize,
-                                    cellSize: cellSize,
-                                    currentPath: currentPath,
-                                    startPos: startPos!,
-                                    endPos: endPos!,
-                                    onCellTouch: _handleCellTouch,
-                                    onDragEnd: _handleDragEnd,
-                                  ),
-                                );
-                              },
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.95),
+                                      borderRadius: BorderRadius.circular(16),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.3),
+                                          blurRadius: 10,
+                                          offset: const Offset(0, 5),
+                                        ),
+                                      ],
+                                    ),
+                                    child: GestureDetector(
+                                      behavior: HitTestBehavior.opaque,
+                                      onPanStart: (d) =>
+                                          _handlePanStart(d, constraints),
+                                      onPanUpdate: (d) =>
+                                          _handlePanUpdate(d, constraints),
+                                      onPanEnd: (d) =>
+                                          _handlePanEnd(d, constraints),
+                                      child: CustomPaint(
+                                        painter: TracingNumberPainter(
+                                          userPath: userTracePath,
+                                          targetSegments: targetSegments,
+                                          currentSegmentIndex:
+                                              currentSegmentIndex,
+                                          isComplete: gameComplete,
+                                        ),
+                                        size: Size.infinite,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
                             ),
                           ),
                         ),
                       ),
-                      // Right sidebar
+                      // RIGHT SIDEBAR
                       Container(
                         width: 90,
                         padding: const EdgeInsets.all(8),
@@ -732,21 +599,15 @@ class _NumberPathGameState extends State<NumberPathGame>
                               ),
                               const SizedBox(height: 15),
                               _buildStatItem(
-                                "Steps",
-                                "${currentPath.length}",
-                                Icons.timeline,
-                              ),
-                              const SizedBox(height: 15),
-                              _buildStatItem(
                                 "Time",
                                 "${_timeRemaining}s",
                                 Icons.timer,
                               ),
                               const SizedBox(height: 15),
                               _buildStatItem(
-                                "Grid",
-                                "${gridSize}×$gridSize",
-                                Icons.grid_4x4,
+                                "Number",
+                                "$currentNumber",
+                                Icons.looks_one,
                               ),
                               const SizedBox(height: 20),
                               Container(
@@ -758,11 +619,10 @@ class _NumberPathGameState extends State<NumberPathGame>
                                   onPressed: _initializeGame,
                                   icon: const Icon(Icons.refresh),
                                   color: Colors.green.shade700,
-                                  tooltip: 'New Puzzle',
+                                  tooltip: 'New Number',
                                 ),
                               ),
                               const SizedBox(height: 10),
-                              // Explicit Exit Button in Sidebar
                               Container(
                                 decoration: BoxDecoration(
                                   color: Colors.white.withOpacity(0.9),
@@ -785,7 +645,7 @@ class _NumberPathGameState extends State<NumberPathGame>
               ),
             ),
 
-            // --- CONFETTI OVERLAYS ---
+            // 2. CONFETTI OVERLAYS
             Align(
               alignment: Alignment.topCenter,
               child: ConfettiWidget(
@@ -805,28 +665,6 @@ class _NumberPathGameState extends State<NumberPathGame>
               ),
             ),
             Align(
-              alignment: Alignment.topLeft,
-              child: ConfettiWidget(
-                confettiController: _bgConfettiController,
-                blastDirection: pi / 3,
-                emissionFrequency: 0.1,
-                numberOfParticles: 25,
-                colors: const [Colors.green, Colors.blue, Colors.pink],
-                createParticlePath: drawStar,
-              ),
-            ),
-            Align(
-              alignment: Alignment.topRight,
-              child: ConfettiWidget(
-                confettiController: _bgConfettiController,
-                blastDirection: 2 * pi / 3,
-                emissionFrequency: 0.1,
-                numberOfParticles: 25,
-                colors: const [Colors.purple, Colors.amber, Colors.red],
-                createParticlePath: drawStar,
-              ),
-            ),
-            Align(
               alignment: Alignment.centerLeft,
               child: ConfettiWidget(
                 confettiController: _bgConfettiController,
@@ -834,7 +672,6 @@ class _NumberPathGameState extends State<NumberPathGame>
                 maxBlastForce: 15,
                 emissionFrequency: 0.08,
                 numberOfParticles: 20,
-                colors: const [Colors.yellow, Colors.orange, Colors.red],
                 createParticlePath: drawStar,
               ),
             ),
@@ -846,29 +683,6 @@ class _NumberPathGameState extends State<NumberPathGame>
                 maxBlastForce: 15,
                 emissionFrequency: 0.08,
                 numberOfParticles: 20,
-                colors: const [Colors.blue, Colors.cyan, Colors.purple],
-                createParticlePath: drawStar,
-              ),
-            ),
-            Align(
-              alignment: Alignment.bottomLeft,
-              child: ConfettiWidget(
-                confettiController: _bgConfettiController,
-                blastDirection: -pi / 4,
-                emissionFrequency: 0.08,
-                numberOfParticles: 15,
-                colors: const [Colors.teal, Colors.lime, Colors.indigo],
-                createParticlePath: drawStar,
-              ),
-            ),
-            Align(
-              alignment: Alignment.bottomRight,
-              child: ConfettiWidget(
-                confettiController: _bgConfettiController,
-                blastDirection: -3 * pi / 4,
-                emissionFrequency: 0.08,
-                numberOfParticles: 15,
-                colors: const [Colors.pinkAccent, Colors.deepOrange],
                 createParticlePath: drawStar,
               ),
             ),
@@ -880,23 +694,14 @@ class _NumberPathGameState extends State<NumberPathGame>
 
   Widget _buildStatItem(String label, String value, IconData icon) {
     Color valueColor = Colors.green;
-    if (label == "Time" && _timeRemaining <= 10) {
-      valueColor = Colors.red;
-    } else if (label == "Time" && _timeRemaining <= 20) {
-      valueColor = Colors.orange;
-    }
-
+    if (label == "Time" && _timeRemaining <= 10) valueColor = Colors.red;
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.9),
+        color: Colors.white.withOpacity(0.85),
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            blurRadius: 3,
-            offset: const Offset(1, 1),
-          ),
+          BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 3),
         ],
       ),
       child: Column(
@@ -925,301 +730,180 @@ class _NumberPathGameState extends State<NumberPathGame>
   }
 }
 
-// --- UNCHANGED CORE LOGIC BELOW ---
+// --- 3. CUSTOM PAINTER (BUBBLE STYLE + SMOOTH CURVES) ---
+class TracingNumberPainter extends CustomPainter {
+  final List<Offset> userPath;
+  final List<List<Offset>> targetSegments;
+  final int currentSegmentIndex;
+  final bool isComplete;
 
-class NumberGameGrid extends StatefulWidget {
-  final List<List<int?>> grid;
-  final int gridSize;
-  final double cellSize;
-  final List<Offset> currentPath;
-  final Offset startPos;
-  final Offset endPos;
-  final Function(Offset) onCellTouch;
-  final Function() onDragEnd;
-
-  const NumberGameGrid({
-    super.key,
-    required this.grid,
-    required this.gridSize,
-    required this.cellSize,
-    required this.currentPath,
-    required this.startPos,
-    required this.endPos,
-    required this.onCellTouch,
-    required this.onDragEnd,
+  TracingNumberPainter({
+    required this.userPath,
+    required this.targetSegments,
+    required this.currentSegmentIndex,
+    required this.isComplete,
   });
 
   @override
-  State<NumberGameGrid> createState() => _NumberGameGridState();
-}
+  void paint(Canvas canvas, Size size) {
+    final scale = size.width / 1000.0;
 
-class _NumberGameGridState extends State<NumberGameGrid> {
-  Offset? lastProcessedCell;
+    // TRACK STYLE: Huge width, Black Border + White Fill with more rounding
+    final double trackWidth = 120.0 * scale;
+    final double borderWidth = 10.0 * scale;
 
-  void _handlePointerEvent(Offset localPosition) {
-    final x = (localPosition.dx / widget.cellSize).floor();
-    final y = (localPosition.dy / widget.cellSize).floor();
+    Paint borderPaint = Paint()
+      ..color = Colors.black
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..strokeWidth = trackWidth + borderWidth;
 
-    if (x >= 0 && x < widget.gridSize && y >= 0 && y < widget.gridSize) {
-      final cellPos = Offset(x.toDouble(), y.toDouble());
-      if (lastProcessedCell != cellPos) {
-        lastProcessedCell = cellPos;
-        widget.onCellTouch(cellPos);
+    Paint fillPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..strokeWidth = trackWidth;
+
+    Paint dashedPaint = Paint()
+      ..color = Colors.grey
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 3 * scale;
+
+    // --- SMOOTH PATH CREATION (Catmull-Rom Spline for rounded curves) ---
+    Path createSmoothPath(List<Offset> pts) {
+      Path p = Path();
+      if (pts.isEmpty) return p;
+
+      // Start
+      p.moveTo(pts[0].dx * scale, pts[0].dy * scale);
+
+      // If only 2 points, just straight line
+      if (pts.length == 2) {
+        p.lineTo(pts[1].dx * scale, pts[1].dy * scale);
+        return p;
+      }
+
+      // Create smooth curves using quadratic bezier interpolation
+      for (int i = 0; i < pts.length - 1; i++) {
+        Offset current = pts[i];
+        Offset next = pts[i + 1];
+
+        if (i == pts.length - 2) {
+          // Last segment - just line to end
+          p.lineTo(next.dx * scale, next.dy * scale);
+        } else {
+          // Create smooth curve using control point
+          Offset afterNext = pts[i + 2];
+
+          // Control point is slightly ahead of next point toward afterNext
+          double controlX = next.dx * scale;
+          double controlY = next.dy * scale;
+
+          // End point is midway to afterNext for smooth connection
+          double endX = (next.dx + afterNext.dx) / 2 * scale;
+          double endY = (next.dy + afterNext.dy) / 2 * scale;
+
+          p.quadraticBezierTo(controlX, controlY, endX, endY);
+        }
+      }
+
+      return p;
+    }
+
+    // 1. Draw Border (Black)
+    for (var seg in targetSegments) {
+      canvas.drawPath(createSmoothPath(seg), borderPaint);
+    }
+
+    // 2. Draw Fill (White)
+    for (var seg in targetSegments) {
+      canvas.drawPath(createSmoothPath(seg), fillPaint);
+    }
+
+    // 3. Draw Dashed Guide & Arrows
+    for (int i = 0; i < targetSegments.length; i++) {
+      Path p = createSmoothPath(targetSegments[i]);
+
+      PathMetrics metrics = p.computeMetrics();
+      for (PathMetric metric in metrics) {
+        double dist = 0;
+        while (dist < metric.length) {
+          canvas.drawPath(
+            metric.extractPath(dist, dist + 15 * scale),
+            dashedPaint,
+          );
+          dist += 30 * scale;
+        }
+
+        if (metric.length > 50) {
+          Tangent? t = metric.getTangentForOffset(metric.length * 0.5);
+          if (t != null) {
+            _drawArrowHead(canvas, t.position, t.vector, scale);
+          }
+        }
       }
     }
-  }
 
-  @override
-  Widget build(BuildContext context) {
-    return Listener(
-      onPointerDown: (event) {
-        lastProcessedCell = null;
-        _handlePointerEvent(event.localPosition);
-      },
-      onPointerMove: (event) {
-        _handlePointerEvent(event.localPosition);
-      },
-      onPointerUp: (event) {
-        lastProcessedCell = null;
-        widget.onDragEnd();
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.1),
-          border: Border.all(color: Colors.white.withOpacity(0.3), width: 2),
-          borderRadius: BorderRadius.circular(8),
+    // 4. Draw Start Numbers (1, 2, 3) dots
+    TextPainter tp = TextPainter(textDirection: TextDirection.ltr);
+    for (int i = 0; i < targetSegments.length; i++) {
+      if (targetSegments[i].isEmpty) continue;
+      Offset start = targetSegments[i][0];
+      Offset scaledStart = Offset(start.dx * scale, start.dy * scale);
+
+      bool isActive = (i == currentSegmentIndex);
+      Color dotColor = isActive ? Colors.green : Colors.black;
+
+      canvas.drawCircle(scaledStart, 15 * scale, Paint()..color = dotColor);
+
+      tp.text = TextSpan(
+        text: '${i + 1}',
+        style: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+          fontSize: 18 * scale,
         ),
-        child: Stack(
-          children: [
-            if (widget.currentPath.length > 1)
-              CustomPaint(
-                size: Size(
-                  widget.cellSize * widget.gridSize,
-                  widget.cellSize * widget.gridSize,
-                ),
-                painter: NumberPathPainter(widget.currentPath, widget.cellSize),
-              ),
-            GridView.builder(
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: widget.gridSize,
-                childAspectRatio: 1,
-              ),
-              itemCount: widget.gridSize * widget.gridSize,
-              itemBuilder: (context, index) {
-                int x = index % widget.gridSize;
-                int y = index ~/ widget.gridSize;
-                Offset cellPos = Offset(x.toDouble(), y.toDouble());
-                int? value = widget.grid[y][x];
-
-                bool isInPath = widget.currentPath.contains(cellPos);
-                bool isStart = cellPos == widget.startPos;
-                bool isEnd = cellPos == widget.endPos;
-
-                return Container(
-                  margin: const EdgeInsets.all(2),
-                  decoration: BoxDecoration(
-                    color: isInPath
-                        ? Colors.blue.withOpacity(0.3)
-                        : Colors.white.withOpacity(0.8),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: isStart
-                          ? Colors.green.shade700
-                          : isEnd
-                          ? Colors.red.shade700
-                          : Colors.grey.shade300,
-                      width: isStart || isEnd ? 3 : 1,
-                    ),
-                    boxShadow: [
-                      if (isInPath)
-                        BoxShadow(
-                          color: Colors.blue.withOpacity(0.5),
-                          blurRadius: 4,
-                        ),
-                    ],
-                  ),
-                  child: Center(
-                    child: isStart
-                        ? Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.play_arrow,
-                                color: Colors.green.shade700,
-                                size: widget.cellSize * 0.35,
-                              ),
-                              Text(
-                                'START',
-                                style: TextStyle(
-                                  fontSize: widget.cellSize * 0.1,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.green.shade700,
-                                ),
-                              ),
-                            ],
-                          )
-                        : isEnd
-                        ? Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.flag,
-                                color: Colors.red.shade700,
-                                size: widget.cellSize * 0.35,
-                              ),
-                              Text(
-                                'END',
-                                style: TextStyle(
-                                  fontSize: widget.cellSize * 0.1,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.red.shade700,
-                                ),
-                              ),
-                            ],
-                          )
-                        : Text(
-                            '$value',
-                            style: TextStyle(
-                              fontSize: widget.cellSize * 0.35,
-                              fontWeight: FontWeight.bold,
-                              color: isInPath
-                                  ? Colors.blue.shade800
-                                  : Colors.black87,
-                            ),
-                          ),
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class NumberPathPainter extends CustomPainter {
-  final List<Offset> path;
-  final double cellSize;
-
-  NumberPathPainter(this.path, this.cellSize);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (path.length < 2) return;
-
-    final paint = Paint()
-      ..color = Colors.blue.withOpacity(0.6)
-      ..strokeWidth = 8
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-
-    final pathToDraw = Path();
-    pathToDraw.moveTo(
-      path[0].dx * cellSize + cellSize / 2,
-      path[0].dy * cellSize + cellSize / 2,
-    );
-
-    for (int i = 1; i < path.length; i++) {
-      pathToDraw.lineTo(
-        path[i].dx * cellSize + cellSize / 2,
-        path[i].dy * cellSize + cellSize / 2,
       );
+      tp.layout();
+      tp.paint(canvas, scaledStart - Offset(tp.width / 2, tp.height / 2));
     }
 
-    canvas.drawPath(pathToDraw, paint);
-  }
+    // 5. Draw User Trace
+    Paint userPaint = Paint()
+      ..color = Colors.blue.withOpacity(0.6)
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..strokeWidth = trackWidth * 0.6;
 
-  @override
-  bool shouldRepaint(CustomPainter oldDelegate) => true;
-}
-
-// Transition Video Player Widget
-class TransitionVideoPlayer extends StatefulWidget {
-  final VoidCallback onComplete;
-
-  const TransitionVideoPlayer({super.key, required this.onComplete});
-
-  @override
-  State<TransitionVideoPlayer> createState() => _TransitionVideoPlayerState();
-}
-
-class _TransitionVideoPlayerState extends State<TransitionVideoPlayer> {
-  late VideoPlayerController _controller;
-  bool _isInitialized = false;
-  bool _hasCompleted = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller =
-        VideoPlayerController.asset('assets/videos/test_transition.mp4')
-          ..setLooping(false)
-          ..initialize()
-              .then((_) {
-                if (mounted) {
-                  setState(() {
-                    _isInitialized = true;
-                  });
-                  _controller.play();
-                }
-              })
-              .catchError((error) {
-                if (!_hasCompleted) {
-                  _hasCompleted = true;
-                  widget.onComplete();
-                }
-              });
-
-    _controller.addListener(_checkVideoProgress);
-  }
-
-  void _checkVideoProgress() {
-    if (!mounted || _hasCompleted) return;
-
-    if (_controller.value.isInitialized &&
-        _controller.value.position >= _controller.value.duration) {
-      _hasCompleted = true;
-      widget.onComplete();
+    if (userPath.isNotEmpty) {
+      Path uPath = Path();
+      uPath.moveTo(userPath[0].dx, userPath[0].dy);
+      for (var pt in userPath) uPath.lineTo(pt.dx, pt.dy);
+      canvas.drawPath(uPath, userPaint);
     }
   }
 
-  @override
-  void dispose() {
-    _controller.removeListener(_checkVideoProgress);
-    _controller.dispose();
-    super.dispose();
+  void _drawArrowHead(Canvas canvas, Offset pos, Offset dir, double scale) {
+    double angle = atan2(dir.dy, dir.dx);
+    double wingLen = 15 * scale;
+
+    Offset p1 =
+        pos + Offset(cos(angle + 2.5) * wingLen, sin(angle + 2.5) * wingLen);
+    Offset p2 =
+        pos + Offset(cos(angle - 2.5) * wingLen, sin(angle - 2.5) * wingLen);
+
+    Paint p = Paint()
+      ..color = Colors.black
+      ..strokeWidth = 3 * scale
+      ..style = PaintingStyle.stroke;
+    canvas.drawLine(pos, p1, p);
+    canvas.drawLine(pos, p2, p);
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Center(
-        child: _isInitialized
-            ? SizedBox.expand(
-                child: FittedBox(
-                  fit: BoxFit.contain,
-                  child: SizedBox(
-                    width: _controller.value.size.width,
-                    height: _controller.value.size.height,
-                    child: VideoPlayer(_controller),
-                  ),
-                ),
-              )
-            : Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  CircularProgressIndicator(color: Colors.white),
-                  SizedBox(height: 20),
-                  Text(
-                    'Loading transition...',
-                    style: TextStyle(color: Colors.white, fontSize: 16),
-                  ),
-                ],
-              ),
-      ),
-    );
-  }
+  bool shouldRepaint(TracingNumberPainter old) => true;
 }
