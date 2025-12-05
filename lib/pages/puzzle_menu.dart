@@ -8,8 +8,14 @@ class PuzzleMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final List<String> stories = [
-      'assets/images/cat_puzzle.png',
+      'assets/images/pond.png',
+      'assets/images/birb.png',
+      'assets/images/panda.png',
+      'assets/images/wolf.png',
+      'assets/images/capy.png',
+      'assets/images/redi.png',
       'assets/images/bear_puzzle.png',
+      'assets/images/cat_puzzle.png',
       'assets/images/wizard_puzzle.png',
     ];
 
