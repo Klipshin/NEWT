@@ -6,7 +6,6 @@ import 'connect_dots.dart';
 import 'animal_sounds.dart';
 import 'landing_page.dart';
 import "guess_animal.dart";
-import 'number_trace.dart';
 import 'color_game.dart';
 // import 'puzzle_menu.dart'; // Duplicate import removed
 
@@ -28,7 +27,6 @@ class _GamesMenuState extends State<GamesMenu> {
   final List<String> gameImages = const [
     'assets/images/fruits_basket.png',
     'assets/images/guess_the_animal.png',
-    'assets/images/number_tracing.png',
     'assets/images/animal_sounds.png',
     'assets/images/puzzle_piece.png',
     'assets/images/flip_a_card.png',
@@ -91,11 +89,6 @@ class _GamesMenuState extends State<GamesMenu> {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => const GuessAnimalGame()),
-      );
-    } else if (image.contains('number_tracing')) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const NumberPathGame()),
       );
     } else if (image.contains('animal_sounds')) {
       Navigator.push(
