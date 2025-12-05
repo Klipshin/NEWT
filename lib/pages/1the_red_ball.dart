@@ -15,23 +15,22 @@ class _StoryBookPage1State extends State<StoryBookPage1> {
   bool _isAudioPlaying = false;
 
   // Audio files mapped to pages.
-  // Index 0 is empty string '' because Title Page has no audio.
   final List<String> _audioPaths = [
     '', // Index 0: Title Page (No Audio)
-    'sounds/one_sunny.m4a', // Index 1: Page 1
-    'sounds/boing.m4a', // Index 2: Page 2
-    'sounds/her_friend.m4a', // Index 3: Page 3
-    'sounds/they_took.m4a', // Index 4: Page 4
-    'sounds/they_laughed.m4a', // Index 5: Page 5
+    'sounds/one_sunny.m4a',
+    'sounds/boing.m4a',
+    'sounds/her_friend.m4a',
+    'sounds/they_took.m4a',
+    'sounds/they_laughed.m4a',
   ];
 
   final List<String> _pages = [
-    'assets/images/1-TheRedBall-1Title.png', // Index 0
-    'assets/images/1-TheRedBall-P1.png', // Index 1
-    'assets/images/1-TheRedBall-P2.png', // Index 2
-    'assets/images/1-TheRedBall-P3.png', // Index 3
-    'assets/images/1-TheRedBall-P4.png', // Index 4
-    'assets/images/1-TheRedBall-P5.png', // Index 5
+    'assets/images/1-TheRedBall-1Title.png',
+    'assets/images/1-TheRedBall-P1.png',
+    'assets/images/1-TheRedBall-P2.png',
+    'assets/images/1-TheRedBall-P3.png',
+    'assets/images/1-TheRedBall-P4.png',
+    'assets/images/1-TheRedBall-P5.png',
   ];
 
   int _currentPage = 0;
@@ -50,8 +49,6 @@ class _StoryBookPage1State extends State<StoryBookPage1> {
   void initState() {
     super.initState();
     _audioPlayer = AudioPlayer();
-
-    // Set the correct prefix for audio assets
     _audioPlayer.audioCache.prefix = 'assets/';
 
     _audioPlayer.onPlayerComplete.listen((event) {
@@ -71,7 +68,6 @@ class _StoryBookPage1State extends State<StoryBookPage1> {
 
   // --- AUDIO LOGIC ---
   Future<void> _toggleAudio() async {
-    // Safety check: Don't play on title page or if no file exists
     if (_currentPage == 0 || _audioPaths[_currentPage].isEmpty) return;
 
     if (_isAudioPlaying) {
@@ -107,11 +103,22 @@ class _StoryBookPage1State extends State<StoryBookPage1> {
       if (question == 2) q2Answer = imagePath;
       if (question == 3) q3Answer = imagePath;
     });
+  }
+
+  void _submitQuiz() {
+    if (q1Answer == null || q2Answer == null || q3Answer == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please answer all questions first!')),
+      );
+      return;
+    }
 
     if (q1Answer == correctQ1 &&
         q2Answer == correctQ2 &&
         q3Answer == correctQ3) {
       _showResultDialog();
+    } else {
+      _showTryAgainDialog();
     }
   }
 
@@ -168,6 +175,59 @@ class _StoryBookPage1State extends State<StoryBookPage1> {
     );
   }
 
+  void _showTryAgainDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Oops!',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 26,
+            fontWeight: FontWeight.bold,
+            color: Colors.orange,
+          ),
+        ),
+        content: const Text(
+          'Some answers are not correct yet.\nDo you want to try again?',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 18),
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text('Try Again'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text('Back to Menu'),
+          ),
+        ],
+      ),
+    );
+  }
+
   // --- QUIZ UI ---
   Widget _buildQuiz() {
     return Stack(
@@ -178,6 +238,7 @@ class _StoryBookPage1State extends State<StoryBookPage1> {
             fit: BoxFit.cover,
           ),
         ),
+        // Back button for Quiz
         Positioned(
           top: 50,
           left: 40,
@@ -195,7 +256,9 @@ class _StoryBookPage1State extends State<StoryBookPage1> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              // Original Top Spacing
               const SizedBox(height: 40),
+
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -204,7 +267,10 @@ class _StoryBookPage1State extends State<StoryBookPage1> {
                   _answerImageButton(1, 'assets/images/1-1B.png'),
                 ],
               ),
+
+              // Original Spacing restored (75)
               const SizedBox(height: 75),
+
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -213,7 +279,10 @@ class _StoryBookPage1State extends State<StoryBookPage1> {
                   _answerImageButton(2, 'assets/images/1-2B.png'),
                 ],
               ),
+
+              // Original Spacing restored (60)
               const SizedBox(height: 60),
+
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -221,6 +290,39 @@ class _StoryBookPage1State extends State<StoryBookPage1> {
                   const SizedBox(width: 20),
                   _answerImageButton(3, 'assets/images/1-3B.png'),
                 ],
+              ),
+
+              // Small gap before submit
+              const SizedBox(height: 10),
+
+              // --- SUBMIT BUTTON ---
+              GestureDetector(
+                onTap: _submitQuiz,
+                child: Image.asset(
+                  'assets/images/submit.png',
+                  width: 130, // Made even slimmer to fit
+                  errorBuilder: (context, error, stack) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.green,
+                        borderRadius: BorderRadius.circular(25),
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                      child: const Text(
+                        'SUBMIT',
+                        style: TextStyle(
+                          fontSize: 20,
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ),
             ],
           ),
@@ -291,11 +393,11 @@ class _StoryBookPage1State extends State<StoryBookPage1> {
                   ),
                 ),
 
-                // --- VOICE OVER BUTTON (HIDDEN ON TITLE PAGE) ---
+                // Voice Over Button (Top Left)
                 if (!isTitlePage)
                   Positioned(
                     top: 20,
-                    right: 20,
+                    left: 20,
                     child: Container(
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.8),
@@ -321,7 +423,8 @@ class _StoryBookPage1State extends State<StoryBookPage1> {
                     ),
                   ),
 
-                if (isTitlePage)
+                if (isTitlePage) ...[
+                  // ... your existing Start button ...
                   Positioned(
                     bottom: 36,
                     right: sidePadding,
@@ -334,6 +437,24 @@ class _StoryBookPage1State extends State<StoryBookPage1> {
                     ),
                   ),
 
+                  // NEW: Normal Back/Exit Button (Top Left)
+                  Positioned(
+                    top: 50, // Adjust for status bar/notch
+                    left: sidePadding,
+                    child: IconButton(
+                      icon: const Icon(
+                        Icons
+                            .arrow_back_rounded, // You can also use Icons.close_rounded
+                        size: 40,
+                        color: Colors
+                            .black, // Change to Colors.black if background is light
+                      ),
+                      onPressed: () {
+                        Navigator.pop(context);
+                      },
+                    ),
+                  ),
+                ],
                 if (!isTitlePage)
                   Positioned(
                     bottom: bottomOffset,

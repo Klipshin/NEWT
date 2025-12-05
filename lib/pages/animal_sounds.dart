@@ -801,8 +801,8 @@ class _AnimalSoundsQuizState extends State<AnimalSoundsQuiz>
                     alignment: Alignment.bottomCenter,
                     child: Image.asset(
                       'assets/images/dsounds.png',
-                      width: MediaQuery.of(context).size.width * 0.9,
-                      height: MediaQuery.of(context).size.height * 0.6,
+                      width: MediaQuery.of(context).size.width * 1.0,
+                      height: MediaQuery.of(context).size.height * 0.7,
                       fit: BoxFit.contain,
                     ),
                   ),

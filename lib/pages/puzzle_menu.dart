@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
 import 'games_menu.dart';
-import 'puzzle_game.dart'; // 1. Import the PuzzleGame widget
+import 'puzzle_game.dart';
 
-class PuzzleMenu extends StatelessWidget {
+class PuzzleMenu extends StatefulWidget {
   const PuzzleMenu({super.key});
+
+  @override
+  State<PuzzleMenu> createState() => _PuzzleMenuState();
+}
+
+class _PuzzleMenuState extends State<PuzzleMenu> {
+  bool _showDCardOverlay = true;
 
   @override
   Widget build(BuildContext context) {
@@ -16,10 +23,10 @@ class PuzzleMenu extends StatelessWidget {
     return Scaffold(
       body: Stack(
         children: [
-          // 🖼 Background
+          // bg
           Positioned.fill(
             child: Opacity(
-              opacity: 0.8, // 👈 80% visible
+              opacity: 0.8,
               child: Image.asset(
                 'assets/images/landingv2.png',
                 fit: BoxFit.cover,
@@ -27,7 +34,7 @@ class PuzzleMenu extends StatelessWidget {
             ),
           ),
 
-          // 📚 Storybook Carousel
+          // carousel
           Center(
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -40,9 +47,7 @@ class PuzzleMenu extends StatelessWidget {
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 15),
                     child: GestureDetector(
-                      // 2. Add the correct onTap logic to navigate and pass the image path
                       onTap: () {
-                        // Pass the 'path' of the clicked image to the PuzzleGame
                         Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -63,13 +68,12 @@ class PuzzleMenu extends StatelessWidget {
             ),
           ),
 
-          // 🔙 Clickable Back Button — on top of everything
+          // back button
           Positioned(
             top: 40,
             left: 20,
             child: GestureDetector(
-              behavior:
-                  HitTestBehavior.opaque, // ✅ ensures tap always registers
+              behavior: HitTestBehavior.opaque,
               onTap: () {
                 Navigator.pushReplacement(
                   context,
@@ -86,6 +90,28 @@ class PuzzleMenu extends StatelessWidget {
               ),
             ),
           ),
+
+          // dialogue
+          if (_showDCardOverlay)
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  _showDCardOverlay = false;
+                });
+              },
+              child: Container(
+                color: Colors.black.withOpacity(0.75),
+                child: Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Image.asset(
+                    'assets/images/dpuzz.png',
+                    width: MediaQuery.of(context).size.width * 1.0,
+                    height: MediaQuery.of(context).size.height * 0.7,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
