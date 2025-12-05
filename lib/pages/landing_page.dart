@@ -13,7 +13,6 @@ class LandingPage extends StatefulWidget {
 
 class _LandingPageState extends State<LandingPage> {
   final AudioPlayer _audioPlayer = AudioPlayer(); // For Music
-  final AudioPlayer _sfxPlayer = AudioPlayer(); // For Sound Effects (NEW)
 
   bool _isPlaying = true;
   double _swayValue = -0.1;
@@ -27,11 +26,9 @@ class _LandingPageState extends State<LandingPage> {
     _startBouncing();
   }
 
-  // ... (Keep _startBouncing, _startSwaying, _playMusic, _toggleSound as they were) ...
-
   void _startBouncing() {
     Future.doWhile(() async {
-      await Future.delayed(Duration(milliseconds: 800));
+      await Future.delayed(const Duration(milliseconds: 800));
       if (mounted) {
         setState(() {
           _bounceUp = !_bounceUp;
@@ -44,7 +41,7 @@ class _LandingPageState extends State<LandingPage> {
 
   void _startSwaying() {
     Future.doWhile(() async {
-      await Future.delayed(Duration(milliseconds: 2500));
+      await Future.delayed(const Duration(milliseconds: 2500));
       if (mounted) {
         setState(() {
           _swayValue = _swayValue == -0.1 ? 0.1 : -0.1;
@@ -93,7 +90,6 @@ class _LandingPageState extends State<LandingPage> {
   @override
   void dispose() {
     _audioPlayer.dispose();
-    _sfxPlayer.dispose(); // Don't forget to dispose the SFX player too!
     super.dispose();
   }
 
@@ -113,7 +109,7 @@ class _LandingPageState extends State<LandingPage> {
             ),
           ),
 
-          // Logo (NEWT WITH POP SOUND)
+          // Logo (NEWT)
           Positioned(
             top: 5,
             left: 0,
@@ -121,12 +117,7 @@ class _LandingPageState extends State<LandingPage> {
             child: Center(
               child: ZoomTapAnimation(
                 begin: 1.0,
-                end: 0.90, // Shrink slightly when tapped
-                onTap: () {
-                  // Play the pop sound using the separate SFX player
-                  // Assuming pop.mp3 is in assets/sounds/
-                  _sfxPlayer.play(AssetSource('sounds/pop.mp3'));
-                },
+                end: 0.90,
                 child: Image.asset('assets/images/newt3.png', width: 350),
               ),
             ),
@@ -138,7 +129,7 @@ class _LandingPageState extends State<LandingPage> {
             left: 0,
             right: 0,
             child: AnimatedContainer(
-              duration: Duration(milliseconds: 800),
+              duration: const Duration(milliseconds: 800),
               curve: Curves.easeInOut,
               transform: Matrix4.translationValues(0, _bounceUp ? -10 : 0, 0),
               child: GestureDetector(
@@ -156,7 +147,7 @@ class _LandingPageState extends State<LandingPage> {
             left: MediaQuery.of(context).size.width * 0.05,
             child: AnimatedRotation(
               turns: _swayValue / (2 * 3.14159),
-              duration: Duration(milliseconds: 2500),
+              duration: const Duration(milliseconds: 2500),
               curve: Curves.easeInOut,
               child: GestureDetector(
                 onTap: _navigateToStorybooks,

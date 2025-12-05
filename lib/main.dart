@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
+// Make sure this file exists in your project structure
 import 'pages/landing_page.dart';
 
 void main() {
@@ -42,6 +43,8 @@ class IntroVideoPage extends StatefulWidget {
 class _IntroVideoPageState extends State<IntroVideoPage> {
   late VideoPlayerController _controller;
   bool _isVideoInitialized = false;
+  // Flag to prevent multiple navigation attempts
+  bool _isNavigating = false;
 
   @override
   void initState() {
@@ -51,6 +54,7 @@ class _IntroVideoPageState extends State<IntroVideoPage> {
 
   Future<void> _initializeVideo() async {
     // Load video from assets
+    // Ensure the asset path 'assets/videos/new_intro.mp4' is correct
     _controller = VideoPlayerController.asset('assets/videos/new_intro.mp4');
 
     await _controller.initialize();
@@ -71,8 +75,13 @@ class _IntroVideoPageState extends State<IntroVideoPage> {
   }
 
   void _navigateToLandingPage() {
-    // Ensure we don't navigate multiple times
+    // Only navigate if we are not already navigating
+    if (_isNavigating) return;
+
+    _isNavigating = true;
     _controller.pause();
+
+    // Use pushReplacement to navigate and remove the video page from the stack
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (context) => const LandingPage()),
     );
@@ -80,6 +89,7 @@ class _IntroVideoPageState extends State<IntroVideoPage> {
 
   @override
   void dispose() {
+    // Always dispose of the controller to free up resources
     _controller.dispose();
     super.dispose();
   }
@@ -95,19 +105,15 @@ class _IntroVideoPageState extends State<IntroVideoPage> {
 
     return Scaffold(
       backgroundColor: Colors.black,
-      // GestureDetector allows user to tap anywhere to skip video
-      body: GestureDetector(
-        onTap: _navigateToLandingPage,
-        child: SizedBox.expand(
-          child: FittedBox(
-            // BoxFit.cover ensures the video fills the screen
-            // (cropping edges if aspect ratio differs)
-            fit: BoxFit.cover,
-            child: SizedBox(
-              width: _controller.value.size.width,
-              height: _controller.value.size.height,
-              child: VideoPlayer(_controller),
-            ),
+      // The GestureDetector has been removed from the body!
+      body: SizedBox.expand(
+        child: FittedBox(
+          // BoxFit.cover ensures the video fills the screen
+          fit: BoxFit.cover,
+          child: SizedBox(
+            width: _controller.value.size.width,
+            height: _controller.value.size.height,
+            child: VideoPlayer(_controller),
           ),
         ),
       ),
