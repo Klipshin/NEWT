@@ -22,6 +22,11 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
   Timer? _mascotTimer;
   bool _showDCardOverlay = true;
 
+  // NEW: Countdown variables
+  Timer? _countdownTimer;
+  bool _isCountingDown = false;
+  int _countdownNum = 3;
+
   FruitType? currentFruit;
   Offset fruitPosition = Offset.zero;
   bool isDragging = false;
@@ -96,6 +101,7 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
   void dispose() {
     _timer?.cancel();
     _mascotTimer?.cancel();
+    _countdownTimer?.cancel(); // Cancel countdown timer
     _bgMusicPlayer.dispose();
     _poofController.dispose();
     _confettiController.dispose();
@@ -122,6 +128,7 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
       gameActive = false;
       currentFruit = null;
       isDragging = false;
+      _isCountingDown = false; // Reset countdown state
     });
     _confettiController.stop();
     _dialogConfettiController.stop();
@@ -130,6 +137,26 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
   Future<void> _playBackgroundMusic() async {
     await _bgMusicPlayer.setReleaseMode(ReleaseMode.loop);
     await _bgMusicPlayer.play(AssetSource('sounds/basket.mp3'));
+  }
+
+  // NEW: Countdown Logic
+  void _startCountdown() {
+    setState(() {
+      _isCountingDown = true;
+      _countdownNum = 3;
+    });
+
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      setState(() {
+        if (_countdownNum > 1) {
+          _countdownNum--;
+        } else {
+          _isCountingDown = false;
+          timer.cancel();
+          _startGame();
+        }
+      });
+    });
   }
 
   void _startGame() {
@@ -259,6 +286,7 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
 
   Future<void> _onBackButtonPressed() async {
     _timer?.cancel();
+    _countdownTimer?.cancel();
 
     bool? shouldExit = await showDialog<bool>(
       context: context,
@@ -443,7 +471,7 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
               onPressed: () {
                 Navigator.of(context).pop();
                 _initializeGame();
-                _startGame();
+                _startGame(); // Play Again starts immediately
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green,
@@ -836,28 +864,22 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
                           ),
                         ),
 
-                      // Start button
-                      if (!gameActive && currentFruit == null)
+                      // Countdown Text
+                      if (_isCountingDown)
                         Center(
-                          child: ElevatedButton(
-                            onPressed: _startGame,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF4CAF50),
-                              padding: EdgeInsets.symmetric(
-                                horizontal: isTablet ? 30 : 20,
-                                vertical: isTablet ? 15 : 10,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                            child: Text(
-                              'START GAME',
-                              style: TextStyle(
-                                fontSize: isTablet ? 24 : 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
+                          child: Text(
+                            '$_countdownNum',
+                            style: const TextStyle(
+                              fontSize: 100,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              shadows: [
+                                Shadow(
+                                  offset: Offset(2, 2),
+                                  blurRadius: 10,
+                                  color: Colors.black,
+                                ),
+                              ],
                             ),
                           ),
                         ),
@@ -981,6 +1003,8 @@ class _FruitGameState extends State<FruitGame> with TickerProviderStateMixin {
                   setState(() {
                     _showDCardOverlay = false;
                   });
+                  // Trigger countdown instead of just hiding
+                  _startCountdown();
                 },
                 child: Container(
                   color: Colors.black.withOpacity(0.75),
