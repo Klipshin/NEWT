@@ -1,15 +1,21 @@
+//puzzle_game
 import 'dart:async';
 import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:audioplayers/audioplayers.dart'; // Added
-import 'package:confetti/confetti.dart'; // Added
+import 'package:audioplayers/audioplayers.dart';
+import 'package:confetti/confetti.dart';
 
 class PuzzleGame extends StatefulWidget {
   final String imagePath;
+  final AudioPlayer bgMusicPlayer; // **ADDED: Accepts the existing player**
 
-  const PuzzleGame({super.key, required this.imagePath});
+  const PuzzleGame({
+    super.key,
+    required this.imagePath,
+    required this.bgMusicPlayer, // **ADDED to constructor**
+  });
 
   @override
   State<PuzzleGame> createState() => _PuzzleGameState();
@@ -25,7 +31,7 @@ class _PuzzleGameState extends State<PuzzleGame> with TickerProviderStateMixin {
   final String backgroundImagePath = 'assets/images/picnic_new.png';
 
   // --- NEW: Audio & Effects ---
-  late AudioPlayer _bgMusicPlayer;
+  // REMOVED: late AudioPlayer _bgMusicPlayer; (now accessed via widget.bgMusicPlayer)
   late ConfettiController _bgConfettiController;
   late ConfettiController _dialogConfettiController;
 
@@ -41,26 +47,25 @@ class _PuzzleGameState extends State<PuzzleGame> with TickerProviderStateMixin {
       duration: const Duration(seconds: 1),
     );
 
-    // Initialize Audio
-    _bgMusicPlayer = AudioPlayer();
-    _playBackgroundMusic();
-
+    // REMOVED music initialization and play call
     _loadAndSliceImage();
   }
 
   @override
   void dispose() {
-    _bgMusicPlayer.dispose();
+    // IMPORTANT: DO NOT dispose the music player here. It is owned by PuzzleMenu.
     _bgConfettiController.dispose();
     _dialogConfettiController.dispose();
     super.dispose();
   }
 
+  // REMOVED: _playBackgroundMusic method is no longer needed here.
+  /*
   Future<void> _playBackgroundMusic() async {
     await _bgMusicPlayer.setReleaseMode(ReleaseMode.loop);
-    // Using dots.mp3 as it's usually calmer for puzzles
     await _bgMusicPlayer.play(AssetSource('sounds/dots.mp3'));
   }
+  */
 
   // --- STAR PATH FOR CONFETTI ---
   Path drawStar(Size size) {
@@ -461,7 +466,7 @@ class _PuzzleGameState extends State<PuzzleGame> with TickerProviderStateMixin {
               ),
             ),
 
-            // --- CONFETTI OVERLAYS ---
+            // --- CONFETTI OVERLAYS (Unchanged) ---
             Align(
               alignment: Alignment.topCenter,
               child: ConfettiWidget(
@@ -556,6 +561,7 @@ class _PuzzleGameState extends State<PuzzleGame> with TickerProviderStateMixin {
 }
 
 // --- UNCHANGED PUZZLE LOGIC CLASSES ---
+// (PuzzlePiecesArea, PuzzleBoard, PuzzlePiece, PuzzlePiecePainter, ImagePainter remain the same)
 
 class PuzzlePiecesArea extends StatelessWidget {
   final ui.Image image;

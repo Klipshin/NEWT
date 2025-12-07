@@ -631,7 +631,7 @@ class _CardGameState extends State<CardGame> with TickerProviderStateMixin {
                               const SizedBox(height: 20),
                               _buildSideStatItem(
                                 'Sets',
-                                '$setsCompleted/3',
+                                '$setsCompleted',
                                 Icons.grid_4x4,
                               ),
                               const SizedBox(height: 20),

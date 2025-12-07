@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:audioplayers/audioplayers.dart';
 import 'games_menu.dart';
 import 'puzzle_game.dart';
 
@@ -11,6 +12,29 @@ class PuzzleMenu extends StatefulWidget {
 
 class _PuzzleMenuState extends State<PuzzleMenu> {
   bool _showDCardOverlay = true;
+  late AudioPlayer _bgMusicPlayer;
+
+  @override
+  void initState() {
+    super.initState();
+    _bgMusicPlayer = AudioPlayer();
+    _playBackgroundMusic();
+  }
+
+  // IMPORTANT: We REMOVE the dispose call here, as the player needs to stay alive
+  // when navigating to PuzzleGame. We dispose when explicitly leaving the flow (to GamesMenu).
+  @override
+  void dispose() {
+    super.dispose();
+  }
+
+  Future<void> _playBackgroundMusic() async {
+    // Only play if the music is not already playing (e.g., when returning from PuzzleGame)
+    if (_bgMusicPlayer.state != PlayerState.playing) {
+      await _bgMusicPlayer.setReleaseMode(ReleaseMode.loop);
+      await _bgMusicPlayer.play(AssetSource('sounds/intro.mp3'));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -54,10 +78,14 @@ class _PuzzleMenuState extends State<PuzzleMenu> {
                     padding: const EdgeInsets.symmetric(horizontal: 15),
                     child: GestureDetector(
                       onTap: () {
+                        // **CHANGE: Pass the existing AudioPlayer instance to PuzzleGame**
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => PuzzleGame(imagePath: path),
+                            builder: (context) => PuzzleGame(
+                              imagePath: path,
+                              bgMusicPlayer: _bgMusicPlayer,
+                            ),
                           ),
                         );
                       },
@@ -81,6 +109,8 @@ class _PuzzleMenuState extends State<PuzzleMenu> {
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: () {
+                // **CHANGE: Dispose the player only when navigating away from the puzzle flow**
+                _bgMusicPlayer.dispose();
                 Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(builder: (context) => const GamesMenu()),
