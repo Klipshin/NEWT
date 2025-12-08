@@ -85,7 +85,7 @@ class _GuessAnimalGameState extends State<GuessAnimalGame> {
 
   Future<void> _playBackgroundMusic() async {
     await _bgMusicPlayer.setReleaseMode(ReleaseMode.loop);
-    await _bgMusicPlayer.play(AssetSource('sounds/card.mp3'));
+    await _bgMusicPlayer.play(AssetSource('sounds/guess.mp3'));
   }
 
   Path drawStar(Size size) {

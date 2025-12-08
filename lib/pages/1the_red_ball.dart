@@ -10,13 +10,13 @@ class StoryBookPage1 extends StatefulWidget {
 }
 
 class _StoryBookPage1State extends State<StoryBookPage1> {
-  // --- AUDIO SETUP ---
+  // audio setup
   late AudioPlayer _audioPlayer;
   bool _isAudioPlaying = false;
 
-  // Audio files mapped to pages.
+  // audio files mapped to pages
   final List<String> _audioPaths = [
-    '', // Index 0: Title Page (No Audio)
+    '', // title page - no audio
     'sounds/one_sunny.m4a',
     'sounds/boing.m4a',
     'sounds/her_friend.m4a',
@@ -36,7 +36,7 @@ class _StoryBookPage1State extends State<StoryBookPage1> {
   int _currentPage = 0;
   bool _showQuiz = false;
 
-  // --- QUIZ VARIABLES ---
+  // quiz variables
   String? q1Answer;
   String? q2Answer;
   String? q3Answer;
@@ -66,7 +66,7 @@ class _StoryBookPage1State extends State<StoryBookPage1> {
     super.dispose();
   }
 
-  // --- AUDIO LOGIC ---
+  // audio logic
   Future<void> _toggleAudio() async {
     if (_currentPage == 0 || _audioPaths[_currentPage].isEmpty) return;
 
@@ -228,7 +228,7 @@ class _StoryBookPage1State extends State<StoryBookPage1> {
     );
   }
 
-  // --- QUIZ UI ---
+  // quiz UI
   Widget _buildQuiz() {
     return Stack(
       children: [
@@ -238,7 +238,7 @@ class _StoryBookPage1State extends State<StoryBookPage1> {
             fit: BoxFit.cover,
           ),
         ),
-        // Back button for Quiz
+        // back button for quiz
         Positioned(
           top: 50,
           left: 40,
@@ -256,7 +256,6 @@ class _StoryBookPage1State extends State<StoryBookPage1> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Original Top Spacing
               const SizedBox(height: 40),
 
               Row(
@@ -267,8 +266,6 @@ class _StoryBookPage1State extends State<StoryBookPage1> {
                   _answerImageButton(1, 'assets/images/1-1B.png'),
                 ],
               ),
-
-              // Original Spacing restored (75)
               const SizedBox(height: 75),
 
               Row(
@@ -279,8 +276,6 @@ class _StoryBookPage1State extends State<StoryBookPage1> {
                   _answerImageButton(2, 'assets/images/1-2B.png'),
                 ],
               ),
-
-              // Original Spacing restored (60)
               const SizedBox(height: 60),
 
               Row(
@@ -291,16 +286,14 @@ class _StoryBookPage1State extends State<StoryBookPage1> {
                   _answerImageButton(3, 'assets/images/1-3B.png'),
                 ],
               ),
-
-              // Small gap before submit
               const SizedBox(height: 10),
 
-              // --- SUBMIT BUTTON ---
+              // submit button
               GestureDetector(
                 onTap: _submitQuiz,
                 child: Image.asset(
                   'assets/images/submit.png',
-                  width: 130, // Made even slimmer to fit
+                  width: 130,
                   errorBuilder: (context, error, stack) {
                     return Container(
                       padding: const EdgeInsets.symmetric(
@@ -361,7 +354,7 @@ class _StoryBookPage1State extends State<StoryBookPage1> {
     );
   }
 
-  // --- MAIN STORY UI ---
+  // main story UI
   @override
   Widget build(BuildContext context) {
     final bool isTitlePage = _currentPage == 0;
@@ -393,7 +386,7 @@ class _StoryBookPage1State extends State<StoryBookPage1> {
                   ),
                 ),
 
-                // Voice Over Button (Top Left)
+                // voice over button
                 if (!isTitlePage)
                   Positioned(
                     top: 20,
@@ -424,7 +417,7 @@ class _StoryBookPage1State extends State<StoryBookPage1> {
                   ),
 
                 if (isTitlePage) ...[
-                  // ... your existing Start button ...
+                  // start button
                   Positioned(
                     bottom: 36,
                     right: sidePadding,
@@ -437,17 +430,15 @@ class _StoryBookPage1State extends State<StoryBookPage1> {
                     ),
                   ),
 
-                  // NEW: Normal Back/Exit Button (Top Left)
+                  // back button
                   Positioned(
-                    top: 50, // Adjust for status bar/notch
+                    top: 50,
                     left: sidePadding,
                     child: IconButton(
                       icon: const Icon(
-                        Icons
-                            .arrow_back_rounded, // You can also use Icons.close_rounded
+                        Icons.arrow_back_rounded,
                         size: 40,
-                        color: Colors
-                            .black, // Change to Colors.black if background is light
+                        color: Colors.black,
                       ),
                       onPressed: () {
                         Navigator.pop(context);
@@ -455,6 +446,7 @@ class _StoryBookPage1State extends State<StoryBookPage1> {
                     ),
                   ),
                 ],
+
                 if (!isTitlePage)
                   Positioned(
                     bottom: bottomOffset,

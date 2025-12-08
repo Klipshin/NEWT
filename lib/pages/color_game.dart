@@ -13,7 +13,7 @@ class ColorFloodGame extends StatefulWidget {
 
 class _ColorFloodGameState extends State<ColorFloodGame>
     with TickerProviderStateMixin {
-  int gridSize = 4; // Starts 4x4
+  int gridSize = 4; // starts 4x4
   int level = 1;
   int puzzlesSolved = 0;
   bool _showDCardOverlay = true;
@@ -30,7 +30,7 @@ class _ColorFloodGameState extends State<ColorFloodGame>
   late List<String> colors;
   late Map<String, Color> colorMap;
 
-  // --- NEW: Audio & Effects ---
+  // audio & effects ---
   late AudioPlayer _bgMusicPlayer;
   late ConfettiController _bgConfettiController;
   late ConfettiController _dialogConfettiController;
@@ -89,7 +89,7 @@ class _ColorFloodGameState extends State<ColorFloodGame>
   Future<void> _playBackgroundMusic() async {
     await _bgMusicPlayer.setReleaseMode(ReleaseMode.loop);
     // Using a calm track for logic puzzles
-    await _bgMusicPlayer.play(AssetSource('sounds/dots.mp3'));
+    await _bgMusicPlayer.play(AssetSource('sounds/colors.mp3'));
   }
 
   // --- STAR PATH FOR CONFETTI ---

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:newt_2/pages/storybooks.dart';
 import 'games_menu.dart';
 import 'package:zoom_tap_animation/zoom_tap_animation.dart';
-import 'background_music_manager.dart'; // <--- NEW IMPORT
+import 'background_music_manager.dart';
 
 class LandingPage extends StatefulWidget {
   const LandingPage({super.key});
@@ -12,7 +12,7 @@ class LandingPage extends StatefulWidget {
 }
 
 class _LandingPageState extends State<LandingPage> {
-  // Use the global music manager instead of a local AudioPlayer
+  // using the global music manager instead of a local AudioPlayer
   final BackgroundMusicManager _musicManager = BackgroundMusicManager();
 
   // Initialize with the current global state of the music manager
@@ -66,11 +66,12 @@ class _LandingPageState extends State<LandingPage> {
   }
 
   void _toggleSound() async {
-    // Toggles music and updates local state
-    await _musicManager.toggleSound();
+    // Toggle the local state first for immediate UI feedback
     setState(() {
-      _isPlaying = _musicManager.isPlaying;
+      _isPlaying = !_isPlaying;
     });
+    // Then toggle the actual music
+    await _musicManager.toggleSound();
   }
 
   // Navigation functions no longer need pause/resume because the music

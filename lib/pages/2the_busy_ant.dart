@@ -10,13 +10,13 @@ class StoryBookPage2 extends StatefulWidget {
 }
 
 class _StoryBookPage2State extends State<StoryBookPage2> {
-  // --- AUDIO SETUP ---
+  // audio setup
   late AudioPlayer _audioPlayer;
   bool _isAudioPlaying = false;
 
-  // Audio files mapped to pages.
+  // audio files mapped to pages
   final List<String> _audioPaths = [
-    '', // Index 0: Title Page (No Audio)
+    '', // title page - no audio
     'sounds/ant_woke.m4a',
     'sounds/big_crumb.m4a',
     'sounds/then_he_went_back.m4a',
@@ -36,7 +36,7 @@ class _StoryBookPage2State extends State<StoryBookPage2> {
   int _currentPage = 0;
   bool _showQuiz = false;
 
-  // --- QUIZ VARIABLES ---
+  // quiz variables
   String? q1Answer;
   String? q2Answer;
   String? q3Answer;
@@ -66,7 +66,7 @@ class _StoryBookPage2State extends State<StoryBookPage2> {
     super.dispose();
   }
 
-  // --- AUDIO LOGIC ---
+  // audio logic
   Future<void> _toggleAudio() async {
     if (_currentPage == 0 || _audioPaths[_currentPage].isEmpty) return;
 
@@ -106,7 +106,7 @@ class _StoryBookPage2State extends State<StoryBookPage2> {
   }
 
   void _submitQuiz() {
-    // Check if all questions are answered
+    // checks if all questions are answered
     if (q1Answer == null || q2Answer == null || q3Answer == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please answer all questions first!')),
@@ -144,8 +144,8 @@ class _StoryBookPage2State extends State<StoryBookPage2> {
         actions: [
           ElevatedButton(
             onPressed: () {
-              Navigator.pop(context); // Close dialog
-              Navigator.pop(context); // Go back to storybooks.dart
+              Navigator.pop(context); // close dialog
+              Navigator.pop(context); // goes back to storybooks catalog
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.green,
@@ -157,7 +157,7 @@ class _StoryBookPage2State extends State<StoryBookPage2> {
           ),
           ElevatedButton(
             onPressed: () {
-              Navigator.pop(context); // Close dialog
+              Navigator.pop(context); // close dialog
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(builder: (context) => const StoryBookPage3()),
@@ -229,11 +229,11 @@ class _StoryBookPage2State extends State<StoryBookPage2> {
     );
   }
 
-  // --- FIXED QUIZ UI ---
+  // fixed quiz UI
   Widget _buildQuiz() {
     return Stack(
       children: [
-        // Background fills the screen
+        // background
         Positioned.fill(
           child: Image.asset(
             'assets/images/2-TheBusyAnt-P6Quiz.png',
@@ -241,7 +241,7 @@ class _StoryBookPage2State extends State<StoryBookPage2> {
           ),
         ),
 
-        // Back button in top left corner
+        // back button
         Positioned(
           top: 50,
           left: 40,
@@ -255,7 +255,7 @@ class _StoryBookPage2State extends State<StoryBookPage2> {
           ),
         ),
 
-        // Answer buttons with consistent spacing
+        // anwer buttons
         Padding(
           padding: const EdgeInsets.only(left: 300, right: 60),
           child: Column(
@@ -291,16 +291,14 @@ class _StoryBookPage2State extends State<StoryBookPage2> {
                   _answerImageButton(3, 'assets/images/2-3B.png'),
                 ],
               ),
-
-              // Small Gap
               const SizedBox(height: 10),
 
-              // --- SUBMIT BUTTON ---
+              // submit button
               GestureDetector(
                 onTap: _submitQuiz,
                 child: Image.asset(
                   'assets/images/submit.png',
-                  width: 130, // Slim width to fit
+                  width: 130,
                   errorBuilder: (context, error, stack) {
                     return Container(
                       padding: const EdgeInsets.symmetric(
@@ -361,7 +359,7 @@ class _StoryBookPage2State extends State<StoryBookPage2> {
     );
   }
 
-  // --- MAIN STORY UI ---
+  // main story UI
   @override
   Widget build(BuildContext context) {
     final bool isTitlePage = _currentPage == 0;
@@ -393,11 +391,11 @@ class _StoryBookPage2State extends State<StoryBookPage2> {
                   ),
                 ),
 
-                // --- VOICE OVER BUTTON (Top Left) ---
+                // voice over button
                 if (!isTitlePage)
                   Positioned(
                     top: 20,
-                    left: 20, // Moved from right to left
+                    left: 20,
                     child: Container(
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.8),
@@ -424,7 +422,7 @@ class _StoryBookPage2State extends State<StoryBookPage2> {
                   ),
 
                 if (isTitlePage) ...[
-                  // ... your existing Start button ...
+                  // start button
                   Positioned(
                     bottom: 36,
                     right: sidePadding,
@@ -437,17 +435,15 @@ class _StoryBookPage2State extends State<StoryBookPage2> {
                     ),
                   ),
 
-                  // NEW: Normal Back/Exit Button (Top Left)
+                  // back button
                   Positioned(
-                    top: 30, // Adjust for status bar/notch
+                    top: 30,
                     left: sidePadding,
                     child: IconButton(
                       icon: const Icon(
-                        Icons
-                            .arrow_back_rounded, // You can also use Icons.close_rounded
+                        Icons.arrow_back_rounded,
                         size: 40,
-                        color: Colors
-                            .black, // Change to Colors.black if background is light
+                        color: Colors.black,
                       ),
                       onPressed: () {
                         Navigator.pop(context);

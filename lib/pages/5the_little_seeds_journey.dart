@@ -422,7 +422,7 @@ class _StoryBookPage5State extends State<StoryBookPage5> {
                   ),
 
                   Positioned(
-                    top: 30, // Adjust for status bar/notch
+                    top: 50, // Adjust for status bar/notch
                     left: sidePadding,
                     child: IconButton(
                       icon: const Icon(

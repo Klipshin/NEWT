@@ -90,7 +90,7 @@ class _ConnectDotsGameState extends State<ConnectDotsGame>
 
   Future<void> _playBackgroundMusic() async {
     await _bgMusicPlayer.setReleaseMode(ReleaseMode.loop);
-    await _bgMusicPlayer.play(AssetSource('sounds/dots.mp3'));
+    await _bgMusicPlayer.play(AssetSource('sounds/puzzle.mp3'));
   }
 
   void _startMascotAnimation() {
